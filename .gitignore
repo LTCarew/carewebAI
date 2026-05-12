@@ -1,24 +1,42 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 
-# Virtual env
+# Virtual environments
 venv/
 env/
+.venv/
 
-# Django
+# Django database
 db.sqlite3
+*/db.sqlite3
+
+# Media / static files
 media/
 staticfiles/
 
 # Environment variables
-caregiver_registry/.env
+.env
+*.env
 
-# macOS
-.DS_Store
+# Logs
+*.log
 
 # VSCode
 .vscode/
 
-# Logs
-*.log
+# macOS
+.DS_Store
+
+# Python packaging
+*.egg-info/
+dist/
+build/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Migrations cache
+*.sqlite3-journal

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}
+Client Application
+{% endblock %}
+
+{% block content %}
+
+<h1>
+    Client Application
+</h1>
+
+<form method="post">
+
+    {% csrf_token %}
+
+    {{ form.as_p }}
+
+    <button type="submit">
+        Submit Application
+    </button>
+
+</form>
+
+{% endblock %}

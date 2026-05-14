@@ -3,8 +3,6 @@ __pycache__/
 *.py[cod]
 
 # Virtual environments
-venv/
-env/
 .venv/
 
 # Django database

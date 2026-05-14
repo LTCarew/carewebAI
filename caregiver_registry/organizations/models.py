@@ -6,6 +6,8 @@ from django.utils import timezone
 
 class Organization(models.Model):
     name = models.CharField(max_length=255)
+    city = models.CharField(max_length=100)
+    zip_code = models.CharField(max_length=10, blank=True)
 
     primary_admin = models.ForeignKey(
         settings.AUTH_USER_MODEL,

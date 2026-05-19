@@ -1,0 +1,39 @@
+.app-body {
+    background-color: #f4f7fb;
+    min-height: 100vh;
+}
+
+.app-navbar {
+    background: linear-gradient(90deg, #183b56, #2563eb);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.app-navbar .navbar-item {
+    color: white;
+    font-weight: 600;
+}
+
+.app-navbar .navbar-item:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    color: white;
+}
+
+.app-logo {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
+
+.app-hero {
+    background: linear-gradient(135deg, #2563eb, #14b8a6);
+}
+
+.app-card {
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.app-footer {
+    background-color: #ffffff;
+    border-top: 1px solid #e5e7eb;
+}

@@ -6,26 +6,97 @@ Care Registry
 
 {% block content %}
 
-<h1>
-    AI Care Worker Registry
-</h1>
+<div class="columns is-centered">
 
-<p>
-    Apply as a caregiver or client.
-</p>
+    <div class="column is-10">
 
-<section>
+        <div class="card app-card">
 
-    <a href="/apply/caregiver/">
-        Apply as Caregiver
-    </a>
+            <div class="card-content">
 
-    <br><br>
+                <div class="content has-text-centered">
 
-    <a href="/apply/client/">
-        Apply as Client
-    </a>
+                    <h1 class="title is-2 has-text-primary">
+                        AI Care Worker Registry
+                    </h1>
 
-</section>
+                    <p class="subtitle is-5">
+                        Connecting caregivers and clients through accessible,
+                        person-centered matching and support.
+                    </p>
+
+                </div>
+
+                <div class="columns mt-6">
+
+                    <!-- CAREGIVER CARD -->
+                    <div class="column">
+
+                        <div class="card">
+
+                            <div class="card-content">
+
+                                <h2 class="title is-4">
+                                    Caregivers
+                                </h2>
+
+                                <p class="mb-5">
+                                    Apply to join the registry, create your
+                                    profile, and connect with clients seeking
+                                    personal care support.
+                                </p>
+
+                                <a
+                                    href="/apply/caregiver/"
+                                    class="button is-primary is-fullwidth"
+                                >
+                                    Apply as Caregiver
+                                </a>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <!-- CLIENT CARD -->
+                    <div class="column">
+
+                        <div class="card">
+
+                            <div class="card-content">
+
+                                <h2 class="title is-4">
+                                    Clients
+                                </h2>
+
+                                <p class="mb-5">
+                                    Apply for caregiving services and find
+                                    caregivers that align with your needs,
+                                    schedule, and preferences.
+                                </p>
+
+                                <a
+                                    href="/apply/client/"
+                                    class="button is-link is-fullwidth"
+                                >
+                                    Apply as Client
+                                </a>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
 
 {% endblock %}

@@ -1,0 +1,36 @@
+<nav class="navbar app-navbar is-active" role="navigation" aria-label="Main Navigation">
+    <div class="navbar-brand">
+        <a class="navbar-item app-logo" href="/">
+            CareWeb Registry
+        </a>
+    </div>
+
+    <div class="navbar-menu is-active">
+        <div class="navbar-start">
+            <a class="navbar-item" href="/">Home</a>
+
+            {% if user.is_authenticated %}
+                <a class="navbar-item" href="/dashboard/">Dashboard</a>
+            {% endif %}
+        </div>
+
+        <div class="navbar-end">
+            {% if user.is_authenticated %}
+                <div class="navbar-item">
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="button is-light is-small">
+                            Logout
+                        </button>
+                    </form>
+                </div>
+            {% else %}
+                <div class="navbar-item">
+                    <a class="button is-light is-small" href="/login/">
+                        Login
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</nav>

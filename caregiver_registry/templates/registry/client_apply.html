@@ -6,20 +6,243 @@ Client Application
 
 {% block content %}
 
-<h1>
-    Client Application
-</h1>
+<div class="columns is-centered">
+    <div class="column is-10-tablet is-10-desktop">
+        <div class="app-page-intro">
+            <h1 class="title is-2">Client Application</h1>
+            <p class="subtitle is-5">
+                Share your care needs, schedule, and preferences so we can support a clear caregiver match.
+            </p>
+        </div>
 
-<form method="post">
+        <div class="card app-card app-form-card">
+            <div class="card-content">
+                <!-- Progress Indicator -->
+                <div class="app-form-progress">
+                    <div class="app-progress-step is-active" data-step="1">Basic Info</div>
+                    <div class="app-progress-step" data-step="2">Location</div>
+                    <div class="app-progress-step" data-step="3">Care Needs</div>
+                    <div class="app-progress-step" data-step="4">Preferences</div>
+                    <div class="app-progress-step" data-step="5">Schedule</div>
+                </div>
 
-    {% csrf_token %}
+                <form method="post" novalidate id="clientForm">
+                    {% csrf_token %}
 
-    {{ form.as_p }}
+                    {% if form.non_field_errors %}
+                        <div class="notification is-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
 
-    <button type="submit">
-        Submit Application
-    </button>
+                    <!-- Section 1: Basic Information -->
+                    <div class="app-form-section is-active" data-section="1">
+                        <div class="app-form-section-header">
+                            <h2 class="app-form-section-title">Basic Information</h2>
+                            <p class="app-form-section-description">Let's start with your contact details</p>
+                        </div>
 
-</form>
+                        <div class="app-form-grid">
+                            {% for field in form %}
+                                {% if field.name in "organization,name,phone,email,contact_preferences,pronouns" %}
+                                    <div class="field app-field{% if field.field.widget.input_type == 'checkbox' %} app-checkbox-field{% endif %}">
+                                        <label class="label" for="{{ field.id_for_label }}">
+                                            {{ field.label }}
+                                            {% if field.field.required %}<span class="required-indicator" aria-label="required">*</span>{% endif %}
+                                        </label>
+                                        <div class="control{% if field.field.widget.input_type == 'checkbox' %} checkbox-group{% endif %}">
+                                            {{ field }}
+                                        </div>
+                                        {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+                                        {% if field.errors %}<div class="help is-danger" role="alert">{{ field.errors }}</div>{% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Location -->
+                    <div class="app-form-section" data-section="2">
+                        <div class="app-form-section-header">
+                            <h2 class="app-form-section-title">Location</h2>
+                            <p class="app-form-section-description">Where do you need care services?</p>
+                        </div>
+
+                        <div class="app-form-grid">
+                            {% for field in form %}
+                                {% if field.name in "address,base_zip_code" %}
+                                    <div class="field app-field{% if field.field.widget.input_type == 'checkbox' %} app-checkbox-field{% endif %}">
+                                        <label class="label" for="{{ field.id_for_label }}">
+                                            {{ field.label }}
+                                            {% if field.field.required %}<span class="required-indicator" aria-label="required">*</span>{% endif %}
+                                        </label>
+                                        <div class="control{% if field.field.widget.input_type == 'checkbox' %} checkbox-group{% endif %}">
+                                            {{ field }}
+                                        </div>
+                                        {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+                                        {% if field.errors %}<div class="help is-danger" role="alert">{{ field.errors }}</div>{% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Care Needs -->
+                    <div class="app-form-section" data-section="3">
+                        <div class="app-form-section-header">
+                            <h2 class="app-form-section-title">Care Needs</h2>
+                            <p class="app-form-section-description">Tell us about the care and support you need</p>
+                        </div>
+
+                        <div class="app-form-grid">
+                            {% for field in form %}
+                                {% if field.name in "care_needs,additional_care_needs,attendant_care_programs" %}
+                                    <div class="field app-field{% if field.field.widget.input_type == 'checkbox' %} app-checkbox-field{% endif %}">
+                                        <label class="label" for="{{ field.id_for_label }}">
+                                            {{ field.label }}
+                                            {% if field.field.required %}<span class="required-indicator" aria-label="required">*</span>{% endif %}
+                                        </label>
+                                        <div class="control{% if field.field.widget.input_type == 'checkbox' %} checkbox-group{% endif %}">
+                                            {{ field }}
+                                        </div>
+                                        {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+                                        {% if field.errors %}<div class="help is-danger" role="alert">{{ field.errors }}</div>{% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Caregiver Preferences -->
+                    <div class="app-form-section" data-section="4">
+                        <div class="app-form-section-header">
+                            <h2 class="app-form-section-title">Caregiver Preferences</h2>
+                            <p class="app-form-section-description">What qualities are important to you in a caregiver?</p>
+                        </div>
+
+                        <div class="app-form-grid">
+                            {% for field in form %}
+                                {% if field.name in "languages_preferred,pathogen_protocol_preferences,preferences" %}
+                                    <div class="field app-field{% if field.field.widget.input_type == 'checkbox' %} app-checkbox-field{% endif %}">
+                                        <label class="label" for="{{ field.id_for_label }}">
+                                            {{ field.label }}
+                                            {% if field.field.required %}<span class="required-indicator" aria-label="required">*</span>{% endif %}
+                                        </label>
+                                        <div class="control{% if field.field.widget.input_type == 'checkbox' %} checkbox-group{% endif %}">
+                                            {{ field }}
+                                        </div>
+                                        {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+                                        {% if field.errors %}<div class="help is-danger" role="alert">{{ field.errors }}</div>{% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Section 5: Schedule & Availability -->
+                    <div class="app-form-section" data-section="5">
+                        <div class="app-form-section-header">
+                            <h2 class="app-form-section-title">Schedule & Availability</h2>
+                            <p class="app-form-section-description">When do you need care services?</p>
+                        </div>
+
+                        <div class="app-form-grid">
+                            {% for field in form %}
+                                {% if field.name in "schedule_flexibility,hours_per_week" %}
+                                    <div class="field app-field">
+                                        <label class="label" for="{{ field.id_for_label }}">
+                                            {{ field.label }}
+                                            {% if field.field.required %}<span class="required-indicator" aria-label="required">*</span>{% endif %}
+                                        </label>
+                                        <div class="control">
+                                            {{ field }}
+                                        </div>
+                                        {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+                                        {% if field.errors %}<div class="help is-danger" role="alert">{{ field.errors }}</div>{% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% for field in form %}
+                                {% if "_available" in field.name or "_start" in field.name or "_end" in field.name %}
+                                    <div class="field app-field">
+                                        <label class="label" for="{{ field.id_for_label }}">
+                                            {{ field.label }}
+                                            {% if field.field.required %}<span class="required-indicator" aria-label="required">*</span>{% endif %}
+                                        </label>
+                                        <div class="control">
+                                            {{ field }}
+                                        </div>
+                                        {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+                                        {% if field.errors %}<div class="help is-danger" role="alert">{{ field.errors }}</div>{% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Navigation -->
+                    <div class="app-form-navigation">
+                        <button type="button" class="button is-light is-large" id="prevBtn" style="display: none;">
+                            Previous
+                        </button>
+                        <button type="button" class="button is-primary is-large" id="nextBtn">
+                            Next
+                        </button>
+                        <button type="submit" class="button is-primary is-large" id="submitBtn" style="display: none;">
+                            Submit Application
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let currentStep = 1;
+    const totalSteps = 5;
+    const sections = document.querySelectorAll(".app-form-section");
+    const progressSteps = document.querySelectorAll(".app-progress-step");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const submitBtn = document.getElementById("submitBtn");
+
+    function showStep(step) {
+        sections.forEach((section, index) => {
+            section.classList.toggle("is-active", index + 1 === step);
+        });
+
+        progressSteps.forEach((progressStep, index) => {
+            const stepNum = index + 1;
+            progressStep.classList.toggle("is-active", stepNum === step);
+            progressStep.classList.toggle("is-complete", stepNum < step);
+        });
+
+        prevBtn.style.display = step === 1 ? "none" : "inline-block";
+        nextBtn.style.display = step === totalSteps ? "none" : "inline-block";
+        submitBtn.style.display = step === totalSteps ? "inline-block" : "none";
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    nextBtn.addEventListener("click", function () {
+        if (currentStep < totalSteps) {
+            currentStep++;
+            showStep(currentStep);
+        }
+    });
+
+    prevBtn.addEventListener("click", function () {
+        if (currentStep > 1) {
+            currentStep--;
+            showStep(currentStep);
+        }
+    });
+
+    showStep(currentStep);
+});
+</script>
 
 {% endblock %}

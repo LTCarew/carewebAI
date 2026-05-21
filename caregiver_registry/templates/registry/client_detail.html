@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}
+Client Review
+{% endblock %}
+
+{% block content %}
+
+<!-- Admin review header and navigation actions -->
+<div class="level mb-4">
+    <div class="level-left">
+        <div>
+            <h1 class="title is-3">Client Review</h1>
+            <p class="subtitle is-6 mb-0">Review care needs, schedule, and preferences before setting status.</p>
+        </div>
+    </div>
+    <div class="level-right">
+        <a href="{% url 'admin_dashboard' %}" class="button is-light">Back to Dashboard</a>
+    </div>
+</div>
+
+<!-- Status chip + status workflow controls (POST-only) -->
+<div class="box mb-5">
+    <div class="level">
+        <div class="level-left">
+            <div>
+                <p class="heading">Current Status</p>
+                {% if client.status == "approved" %}
+                    <span class="tag is-success is-medium">Approved</span>
+                {% elif client.status == "rejected" %}
+                    <span class="tag is-danger is-medium">Rejected</span>
+                {% else %}
+                    <span class="tag is-warning is-medium">Pending</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="level-right">
+            <div class="buttons">
+                <form method="post" action="{% url 'update_client_status' client.pk 'approved' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button is-success">Approve</button>
+                </form>
+
+                <form method="post" action="{% url 'update_client_status' client.pk 'rejected' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button is-danger">Reject</button>
+                </form>
+
+                <form method="post" action="{% url 'update_client_status' client.pk 'pending' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button is-warning is-light">Mark Pending</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="columns is-multiline">
+    <!-- Identity and organization context -->
+    <div class="column is-half">
+        <div class="card app-card">
+            <div class="card-content">
+                <h2 class="title is-5">Identity & Contact</h2>
+                <p><strong>Name:</strong> {{ client.name }}</p>
+                <p><strong>Email:</strong> {{ client.email }}</p>
+                <p><strong>Phone:</strong> {{ client.phone }}</p>
+                <p><strong>Pronouns:</strong> {{ client.pronouns|default:"Not provided" }}</p>
+                <p><strong>Contact preferences:</strong> {{ client.contact_preferences|join:", "|default:"None selected" }}</p>
+                <p><strong>Organization:</strong> {{ client.organization.name }}</p>
+                <p><strong>Address:</strong> {{ client.address }}</p>
+                <p><strong>Base ZIP:</strong> {{ client.base_zip_code }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Programs and language inputs for matching -->
+    <div class="column is-half">
+        <div class="card app-card">
+            <div class="card-content">
+                <h2 class="title is-5">Programs & Language</h2>
+                <p><strong>Attendant care programs:</strong> {{ client.attendant_care_programs|join:", "|default:"None selected" }}</p>
+                <p><strong>Preferred languages:</strong> {{ client.languages_preferred|join:", "|default:"None selected" }}</p>
+                <p><strong>Hours per week:</strong> {{ client.hours_per_week|default:"Not specified" }}</p>
+                <p><strong>Schedule flexibility:</strong> {{ client.schedule_flexibility|yesno:"Yes,No" }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Availability structure stored as JSON -->
+    <div class="column is-half">
+        <div class="card app-card">
+            <div class="card-content">
+                <h2 class="title is-5">Availability</h2>
+                {% if client.availability %}
+                    <ul>
+                        {% for day, hours in client.availability.items %}
+                            <li><strong>{{ day|title }}:</strong> {{ hours.start }} – {{ hours.end }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>No availability provided.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Care and protocol requirements -->
+    <div class="column is-half">
+        <div class="card app-card">
+            <div class="card-content">
+                <h2 class="title is-5">Care Needs & Protocols</h2>
+                <p><strong>Care needs:</strong> {{ client.care_needs|join:", "|default:"None selected" }}</p>
+                <p><strong>Additional care needs:</strong> {{ client.additional_care_needs|default:"Not provided" }}</p>
+                <p><strong>Pathogen protocol preferences:</strong> {{ client.pathogen_protocol_preferences|join:", "|default:"None selected" }}</p>
+                <p><strong>Preferences:</strong> {{ client.preferences|default:"Not provided" }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registry metadata -->
+    <div class="column is-full">
+        <div class="card app-card">
+            <div class="card-content">
+                <h2 class="title is-5">Metadata</h2>
+                <p><strong>Profile completed:</strong> {{ client.profile_completed|yesno:"Yes,No" }}</p>
+                <p><strong>Created at:</strong> {{ client.created_at }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

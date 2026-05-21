@@ -6,12 +6,26 @@ Application Submitted
 
 {% block content %}
 
-<h1>
-    Application Submitted
-</h1>
+<div class="columns is-centered">
+    <div class="column is-8-tablet is-7-desktop">
+        <div class="card app-card app-status-card">
+            <div class="card-content has-text-centered">
+                <div class="app-icon-badge" aria-hidden="true">✓</div>
 
-<p>
-    Your application is awaiting approval.
-</p>
+                <h1 class="title is-2">
+                    Application Submitted
+                </h1>
+
+                <p class="subtitle is-5">
+                    Thank you. Your application is awaiting approval, and the CareWeb Registry team will review it soon.
+                </p>
+
+                <a href="/" class="button is-primary is-large mt-4">
+                    Return Home
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

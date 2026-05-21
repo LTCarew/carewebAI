@@ -1,14 +1,171 @@
 {% extends "base.html" %}
 
+{% block title %}
+Admin Dashboard
+{% endblock %}
+
 {% block content %}
-<h1>Admin Dashboard</h1>
 
-<p>You have admin staff access.</p>
+<div class="mb-5">
+    <h1 class="title is-2">
+        Admin Dashboard
+    </h1>
 
-<ul>
-    <li>Review pending caregivers</li>
-    <li>Review pending clients</li>
-    <li>Invite staff</li>
-    <li>View registry stats</li>
-</ul>
+    <p class="subtitle">
+        Review caregiver and client applications, open profile details, and manage approval status.
+    </p>
+</div>
+
+<div class="columns mt-5">
+
+    <!-- CAREGIVER LIST -->
+    <div class="column">
+
+        <div class="card app-card">
+            <div class="card-content">
+
+                <div class="level">
+                    <div class="level-left">
+                        <h2 class="title is-4">
+                            Caregiver Applications
+                        </h2>
+                    </div>
+                    <div class="level-right">
+                        <div class="tags">
+                            <span class="tag is-warning is-light">
+                                Pending: {{ pending_caregivers }}
+                            </span>
+                            <span class="tag is-success is-light">
+                                Approved: {{ approved_caregivers }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="table is-fullwidth is-striped is-hoverable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for caregiver in caregivers %}
+                                <tr>
+                                    <td>{{ caregiver.name }}</td>
+                                    <td>{{ caregiver.email }}</td>
+                                    <td>
+                                        {% if caregiver.status == "approved" %}
+                                            <span class="tag is-success">Approved</span>
+                                        {% elif caregiver.status == "rejected" %}
+                                            <span class="tag is-danger">Denied</span>
+                                        {% else %}
+                                            <span class="tag is-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a
+                                            href="{% url 'caregiver_detail' caregiver.pk %}"
+                                            class="button is-small is-link"
+                                        >
+                                            View Details
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4">
+                                        No caregiver applications yet.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CLIENT LIST -->
+    <div class="column">
+
+        <div class="card app-card">
+            <div class="card-content">
+
+                <div class="level">
+                    <div class="level-left">
+                        <h2 class="title is-4">
+                            Client Applications
+                        </h2>
+                    </div>
+                    <div class="level-right">
+                        <div class="tags">
+                            <span class="tag is-warning is-light">
+                                Pending: {{ pending_clients }}
+                            </span>
+                            <span class="tag is-success is-light">
+                                Approved: {{ approved_clients }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="table is-fullwidth is-striped is-hoverable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for client in clients %}
+                                <tr>
+                                    <td>{{ client.name }}</td>
+                                    <td>{{ client.email }}</td>
+                                    <td>
+                                        {% if client.status == "approved" %}
+                                            <span class="tag is-success">Approved</span>
+                                        {% elif client.status == "rejected" %}
+                                            <span class="tag is-danger">Denied</span>
+                                        {% else %}
+                                            <span class="tag is-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a
+                                            href="{% url 'client_detail' client.pk %}"
+                                            class="button is-small is-link"
+                                        >
+                                            View Details
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4">
+                                        No client applications yet.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
 {% endblock %}

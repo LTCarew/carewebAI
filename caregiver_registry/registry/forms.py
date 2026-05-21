@@ -46,6 +46,25 @@ DAYS = [
 ]
 
 
+def apply_bulma_classes(form):
+    """Apply Bulma CSS classes to standard Django form widgets."""
+    for field_name, field in form.fields.items():
+        if isinstance(field.widget, forms.CheckboxSelectMultiple):
+            continue
+
+        if isinstance(field.widget, forms.CheckboxInput):
+            continue
+
+        if isinstance(field.widget, forms.Textarea):
+            field.widget.attrs["class"] = "textarea"
+
+        elif isinstance(field.widget, forms.Select):
+            field.widget.attrs["class"] = "select"
+
+        else:
+            field.widget.attrs["class"] = "input"
+
+
 class AvailabilityMixin:
     def add_availability_fields(self):
         for day in DAYS:
@@ -165,6 +184,7 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.ModelForm):
         self.fields["willing_to_work_cities"].choices = list(cities)
 
         self.add_availability_fields()
+        apply_bulma_classes(self)
 
     def save(self, commit=True):
         caregiver = super().save(commit=False)
@@ -236,6 +256,7 @@ class ClientApplicationForm(AvailabilityMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.add_availability_fields()
+        apply_bulma_classes(self)
 
     def save(self, commit=True):
         client = super().save(commit=False)

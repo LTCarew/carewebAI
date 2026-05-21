@@ -49,4 +49,27 @@ urlpatterns = [
         views.admin_dashboard,
         name="admin_dashboard"
     ),
+    path(
+        "dashboard/admin/caregivers/<int:pk>/",
+        views.caregiver_detail,
+        name="caregiver_detail"
+    ),
+
+    path(
+        "dashboard/admin/clients/<int:pk>/",
+        views.client_detail,
+        name="client_detail"
+    ),
+
+    path(
+        "dashboard/admin/caregivers/<int:pk>/<str:status>/",
+        views.update_caregiver_status,
+        name="update_caregiver_status"
+    ),
+
+    path(
+        "dashboard/admin/clients/<int:pk>/<str:status>/",
+        views.update_client_status,
+        name="update_client_status"
+    ),
 ]

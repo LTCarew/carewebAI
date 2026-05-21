@@ -1,9 +1,21 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Caregiver Dashboard</h1>
+<div class="columns is-centered">
+    <div class="column is-8-tablet is-7-desktop">
+        <div class="card app-card app-dashboard-card">
+            <div class="card-content">
+                <h1 class="title is-2">Caregiver Dashboard</h1>
 
-<p>You have caregiver access.</p>
+                <p class="subtitle is-5">
+                    You have caregiver access.
+                </p>
 
-<a href="#">View Client Registry</a>
+                <a class="button is-link is-large" href="#">
+                    View Client Registry
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -8,6 +8,7 @@ __pycache__/
 # Django database
 db.sqlite3
 */db.sqlite3
+caregiver_registry/db.sqlite3
 
 # Media / static files
 media/

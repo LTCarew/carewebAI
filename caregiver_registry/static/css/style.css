@@ -26,6 +26,8 @@ textarea {
     color: var(--app-text);
 }
 
+
+
 .app-body {
     background: linear-gradient(180deg, #f3f9ff 0%, var(--app-bg) 100%);
     min-height: 100vh;
@@ -301,18 +303,22 @@ ul.errorlist li,
 .button.is-primary {
     background-color: var(--app-primary);
     border-color: transparent;
+    color: #fff !important;
 }
 
 .button.is-primary:hover {
     background-color: var(--app-primary-dark);
+    color: #fff !important;
 }
 
 .button.is-link {
     background-color: #3c6f99;
+    color: #fff !important;
 }
 
 .button.is-link:hover {
     background-color: #335e82;
+    color: #fff !important;
 }
 
 .app-page-intro {

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}
+Network Registry
+{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+    <h1 class="title is-2">Network Registry</h1>
+    {% if organization_name %}
+        <p class="subtitle is-5">Organization: {{ organization_name }}</p>
+    {% endif %}
+
+    {% if is_admin_staff %}
+        <form method="get" class="mb-4">
+            <div class="field is-grouped is-align-items-center">
+                <label class="label mb-0 mr-3" for="registry-view-select">Select registry view</label>
+                <div class="control">
+                    <div class="select">
+                        <select id="registry-view-select" name="view" onchange="this.form.submit()">
+                            <option value="clients" {% if selected_view == "clients" %}selected{% endif %}>
+                                View clients in network
+                            </option>
+                            <option value="caregivers" {% if selected_view == "caregivers" %}selected{% endif %}>
+                                View caregivers in network
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </form>
+    {% endif %}
+</div>
+
+{% if selected_view == "caregivers" %}
+    <div class="card app-card">
+        <div class="card-content">
+            <h2 class="title is-4">Caregivers in Network</h2>
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for caregiver in caregivers %}
+                            <tr>
+                                <td>{{ caregiver.name }}</td>
+                                <td>{{ caregiver.email }}</td>
+                                <td>{{ caregiver.phone }}</td>
+                                <td>
+                                    {% if caregiver.status == "approved" %}
+                                        <span class="tag is-success">Approved</span>
+                                    {% elif caregiver.status == "rejected" %}
+                                        <span class="tag is-danger">Denied</span>
+                                    {% else %}
+                                        <span class="tag is-warning">Pending</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4">No caregivers found in this network.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% elif selected_view == "clients" %}
+    <div class="card app-card">
+        <div class="card-content">
+            <h2 class="title is-4">Clients in Network</h2>
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for client in clients %}
+                            <tr>
+                                <td>{{ client.name }}</td>
+                                <td>{{ client.email }}</td>
+                                <td>{{ client.phone }}</td>
+                                <td>
+                                    {% if client.status == "approved" %}
+                                        <span class="tag is-success">Approved</span>
+                                    {% elif client.status == "rejected" %}
+                                        <span class="tag is-danger">Denied</span>
+                                    {% else %}
+                                        <span class="tag is-warning">Pending</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4">No clients found in this network.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

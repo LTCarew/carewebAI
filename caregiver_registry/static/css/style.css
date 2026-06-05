@@ -8,9 +8,15 @@
     --app-bg: #f7fbff;
     --app-surface: #ffffff;
     --app-text: #1e293b;
-    --app-text-soft: #475569;
+    --app-text-soft: #665575;
     --app-border: #cbd5e1;
     --app-focus: #1d4ed8;
+}
+
+.content,
+.content p,
+p {
+    color: var(--app-text-soft);
 }
 
 html {
@@ -140,6 +146,12 @@ h6.title {
     border-top: 1px solid #dbe7f3;
 }
 
+.app-footer,
+.app-footer strong,
+.app-footer p {
+    color: var(--app-text-soft) !important;
+}
+
 .notification {
     border-radius: 12px;
 }
@@ -203,17 +215,22 @@ select {
     border-radius: 10px;
     border: 2px solid var(--app-border);
     background-color: #fff;
+    color: var(--app-text-soft);
     padding: 0.72rem 0.82rem;
     min-height: 48px;
     font-size: 1rem;
 }
 
-textarea {
+textarea,
+textarea.textarea {
     min-height: 120px;
+    background-color: #fff !important;
+    color: var(--app-text-soft) !important;
 }
 
 input::placeholder,
-textarea::placeholder {
+textarea::placeholder,
+textarea.textarea::placeholder {
     color: #64748b;
 }
 

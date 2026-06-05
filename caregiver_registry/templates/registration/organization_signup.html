@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}
+Organization Setup
+{% endblock %}
+
+{% block content %}
+
+<div class="columns is-centered">
+    <div class="column is-8-tablet is-7-desktop">
+        <div class="card app-card app-form-card">
+            <div class="card-content">
+                <div class="app-page-intro has-text-centered">
+                    <h1 class="title is-2">Set Up Your Organization</h1>
+                    <p class="subtitle is-5">Create your organization and the first staff admin account.</p>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="notification is-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    <h2 class="title is-5 mt-5 mb-3">Organization Information</h2>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.organization_name.id_for_label }}">{{ form.organization_name.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.organization_name }}</div>
+                        {% if form.organization_name.errors %}<div class="help is-danger" role="alert">{{ form.organization_name.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.organization_city.id_for_label }}">{{ form.organization_city.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.organization_city }}</div>
+                        {% if form.organization_city.errors %}<div class="help is-danger" role="alert">{{ form.organization_city.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.organization_zip_code.id_for_label }}">{{ form.organization_zip_code.label }}</label>
+                        <div class="control">{{ form.organization_zip_code }}</div>
+                        {% if form.organization_zip_code.errors %}<div class="help is-danger" role="alert">{{ form.organization_zip_code.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.organization_contact_email.id_for_label }}">{{ form.organization_contact_email.label }}</label>
+                        <div class="control">{{ form.organization_contact_email }}</div>
+                        {% if form.organization_contact_email.errors %}<div class="help is-danger" role="alert">{{ form.organization_contact_email.errors }}</div>{% endif %}
+                    </div>
+
+                    <h2 class="title is-5 mt-5 mb-3">Admin Account</h2>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.first_name }}</div>
+                        {% if form.first_name.errors %}<div class="help is-danger" role="alert">{{ form.first_name.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.last_name }}</div>
+                        {% if form.last_name.errors %}<div class="help is-danger" role="alert">{{ form.last_name.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.username.id_for_label }}">{{ form.username.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.username }}</div>
+                        {% if form.username.errors %}<div class="help is-danger" role="alert">{{ form.username.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.email.id_for_label }}">{{ form.email.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.email }}</div>
+                        {% if form.email.errors %}<div class="help is-danger" role="alert">{{ form.email.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.password1.id_for_label }}">{{ form.password1.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.password1 }}</div>
+                        {% if form.password1.errors %}<div class="help is-danger" role="alert">{{ form.password1.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="field app-field">
+                        <label class="label" for="{{ form.password2.id_for_label }}">{{ form.password2.label }} <span class="required-indicator" aria-label="required">*</span></label>
+                        <div class="control">{{ form.password2 }}</div>
+                        {% if form.password2.errors %}<div class="help is-danger" role="alert">{{ form.password2.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="app-form-actions mt-5">
+                        <button type="submit" class="button is-primary is-large is-fullwidth">
+                            Create Organization & Admin Account
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

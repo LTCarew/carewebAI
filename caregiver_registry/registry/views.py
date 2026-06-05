@@ -137,6 +137,45 @@ def client_dashboard(request):
 
 
 @login_required
+def registry_network(request):
+    """Unified registry page with role-based visibility."""
+    profile = getattr(request.user, "profile", None)
+    if not profile:
+        messages.warning(request, "Your account is missing a role profile. Please contact support.")
+        return redirect("home")
+
+    if not profile.organization:
+        messages.warning(request, "Your account is not linked to an organization yet.")
+        return redirect("dashboard_redirect")
+
+    user_type = profile.user_type
+    organization = profile.organization
+
+    caregivers = Caregiver.objects.filter(organization=organization).order_by("status", "-created_at")
+    clients = Client.objects.filter(organization=organization).order_by("status", "-created_at")
+
+    selected_view = ""
+    if user_type == "client":
+        selected_view = "caregivers"
+    elif user_type == "caregiver":
+        selected_view = "clients"
+    elif user_type == "admin_staff":
+        requested_view = request.GET.get("view", "clients")
+        selected_view = requested_view if requested_view in ["clients", "caregivers"] else "clients"
+    else:
+        messages.error(request, "Unsupported account role for registry access.")
+        return redirect("dashboard_redirect")
+
+    return render(request, "registry/network_registry.html", {
+        "selected_view": selected_view,
+        "is_admin_staff": user_type == "admin_staff",
+        "organization_name": organization.name,
+        "caregivers": caregivers,
+        "clients": clients,
+    })
+
+
+@login_required
 def admin_dashboard(request):
     unauthorized_redirect = _redirect_if_not_admin_staff(request)
     if unauthorized_redirect:
@@ -145,6 +184,12 @@ def admin_dashboard(request):
     caregivers = Caregiver.objects.all().order_by("status", "-created_at")
     clients = Client.objects.all().order_by("status", "-created_at")
 
+    full_name = request.user.get_full_name().strip() or request.user.username
+    organization_name = ""
+    profile = getattr(request.user, "profile", None)
+    if profile and profile.organization:
+        organization_name = profile.organization.name
+
     return render(request, "registry/admin_dashboard.html", {
         "caregivers": caregivers,
         "clients": clients,
@@ -152,6 +197,8 @@ def admin_dashboard(request):
         "pending_clients": clients.filter(status="pending").count(),
         "approved_caregivers": caregivers.filter(status="approved").count(),
         "approved_clients": clients.filter(status="approved").count(),
+        "admin_display_name": full_name,
+        "admin_organization_name": organization_name,
     })
 
 

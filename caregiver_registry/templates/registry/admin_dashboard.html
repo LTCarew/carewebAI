@@ -11,6 +11,16 @@ Admin Dashboard
         Admin Dashboard
     </h1>
 
+    <p class="mb-1">
+        <strong>Welcome:</strong> {{ admin_display_name }}
+    </p>
+
+    {% if admin_organization_name %}
+        <p class="mb-3">
+            <strong>Organization:</strong> {{ admin_organization_name }}
+        </p>
+    {% endif %}
+
     <p class="subtitle">
         Review caregiver and client applications, open profile details, and manage approval status.
     </p>

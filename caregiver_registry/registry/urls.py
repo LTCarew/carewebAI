@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from accounts.views import organization_signup
 
 urlpatterns = [
 
@@ -27,6 +28,12 @@ urlpatterns = [
         name="application_success"
     ),
 
+    path(
+        "signup/organization/",
+        organization_signup,
+        name="organization_signup"
+    ),
+
     path("dashboard/", 
         views.dashboard_redirect, 
         name="dashboard_redirect"
@@ -42,6 +49,12 @@ urlpatterns = [
         "dashboard/client/",
         views.client_dashboard,
         name="client_dashboard"
+    ),
+
+    path(
+        "registry/network/",
+        views.registry_network,
+        name="registry_network"
     ),
 
     path(

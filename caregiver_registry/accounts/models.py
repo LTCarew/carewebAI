@@ -53,3 +53,27 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.user.email})"
+
+
+class StaffProfile(models.Model):
+    """
+    Stores staff-specific information for a person.
+
+    Organization-specific staff details like role, status, invite acceptance,
+    and start date live on organizations.OrganizationStaff so a staff person can
+    belong to multiple organizations without duplicating their person profile.
+    """
+    user_profile = models.OneToOneField(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="staff_profile"
+    )
+
+    title = models.CharField(max_length=150, blank=True)
+    hiring_notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"StaffProfile: {self.user_profile.name or self.user_profile.email}"

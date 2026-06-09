@@ -38,12 +38,13 @@ class Invite(models.Model):
 
 
 # ==============================================
-# Caregivers and Clients
+# Shared Choices
 # ==============================================
 STATUS_CHOICES = [
     ("pending", "Pending"),
     ("approved", "Approved"),
     ("rejected", "Rejected"),
+    ("inactive", "Inactive"),
 ]
 
 
@@ -181,7 +182,7 @@ CARE_NEEDS_CHOICES = [
     ("cognitive_disabilities", "Cognitive disability support"),
     ("complex_illnesses", "Complex illness support"),
     ("deaf_community", "d/Deaf community support"),
-    ("dementia", "Dementia/Alzheimer’s support"),
+    ("dementia", "Dementia/Alzheimer's support"),
     ("developmental_disabilities", "Developmental disability support"),
     ("elders", "Elder / older adult support"),
     ("emergency_preparedness", "Emergency preparedness planning"),
@@ -206,106 +207,17 @@ CARE_NEEDS_CHOICES = [
 ]
 
 
-class Caregiver(models.Model):
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-
-    name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=25)
-    email = models.EmailField()
-
-    contact_preferences = models.JSONField(default=list, blank=True)
-    pronouns = models.CharField(max_length=50, choices=PRONOUN_CHOICES, blank=True)
-
-    base_zip_code = models.CharField(max_length=10)
-    willing_to_work_cities = models.JSONField(default=list, blank=True)
-
-    transportation = models.JSONField(default=list, blank=True)
-    availability = models.JSONField(default=dict, blank=True)
-
-    hours_looking_for = models.CharField(
-        max_length=50,
-        choices=HOURS_LOOKING_FOR_CHOICES
-    )
-
-    certified_ihss_worker = models.BooleanField(default=False)
-    additional_certifications = models.TextField(blank=True)
-
-    experience_with = models.JSONField(default=list, blank=True)
-    languages_spoken = models.JSONField(default=list, blank=True)
-    pathogen_protocols = models.JSONField(default=list, blank=True)
-
-    rate = models.CharField(max_length=50, choices=RATE_CHOICES)
-
-    bio = models.TextField(blank=True)
-
-    availability_confirmation_agreement = models.BooleanField(default=False)
-    wants_training_updates = models.BooleanField(default=False)
-
-    other_ways_find_work = models.TextField(blank=True)
-    helpful_for_finding_work = models.TextField(blank=True)
-
-    release_of_liability = models.BooleanField(default=False)
-    signed_date = models.DateField()
-
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    profile_completed = models.BooleanField(default=False)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-
-class Client(models.Model):
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-
-    name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=25)
-    email = models.EmailField()
-
-    contact_preferences = models.JSONField(default=list, blank=True)
-    pronouns = models.CharField(max_length=50, choices=PRONOUN_CHOICES, blank=True)
-
-    address = models.TextField()
-    base_zip_code = models.CharField(max_length=10)
-
-    attendant_care_programs = models.JSONField(default=list, blank=True)
-
-    languages_preferred = models.JSONField(default=list, blank=True)
-
-    availability = models.JSONField(default=dict, blank=True)
-    schedule_flexibility = models.BooleanField(default=False)
-    hours_per_week = models.PositiveIntegerField(null=True, blank=True)
-
-    care_needs = models.JSONField(default=list, blank=True)
-    additional_care_needs = models.TextField(blank=True)
-
-    preferences = models.TextField(blank=True)
-
-    pathogen_protocol_preferences = models.JSONField(default=list, blank=True)
-
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    profile_completed = models.BooleanField(default=False)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-
 # ==============================================
-# Caregiver and Client Profiles (Post-Approval)
+# Caregiver and Client Profiles
 # ==============================================
 
 class CaregiverProfile(models.Model):
     """
-    Created after a caregiver application is approved.
-    Stores caregiver-specific working fields.
+    Stores caregiver-specific information for a person.
+    Links to UserProfile for shared contact info.
     """
-    from django.conf import settings
-    
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
+    user_profile = models.OneToOneField(
+        "accounts.UserProfile",
         on_delete=models.CASCADE,
         related_name="caregiver_profile"
     )
@@ -338,23 +250,20 @@ class CaregiverProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"CaregiverProfile: {self.user.email}"
+        return f"CaregiverProfile: {self.user_profile.name or self.user_profile.email}"
 
 
 class ClientProfile(models.Model):
     """
-    Created after a client application is approved.
     Stores client-specific care needs and preferences.
+    Links to UserProfile for shared contact info.
     """
-    from django.conf import settings
-    
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
+    user_profile = models.OneToOneField(
+        "accounts.UserProfile",
         on_delete=models.CASCADE,
         related_name="client_profile"
     )
 
-    address = models.TextField()
     base_zip_code = models.CharField(max_length=10)
 
     attendant_care_programs = models.JSONField(default=list, blank=True)
@@ -376,4 +285,100 @@ class ClientProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"ClientProfile: {self.user.email}"
+        return f"ClientProfile: {self.user_profile.name or self.user_profile.email}"
+
+
+# ==============================================
+# Organization Relationships (Junction Tables)
+# ==============================================
+
+class OrganizationCaregiver(models.Model):
+    """
+    Junction table linking caregivers to organizations.
+    Caregivers can belong to multiple organizations.
+    """
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="caregiver_relationships"
+    )
+
+    caregiver_profile = models.ForeignKey(
+        CaregiverProfile,
+        on_delete=models.CASCADE,
+        related_name="organization_relationships"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    approved_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_caregivers"
+    )
+
+    approved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("organization", "caregiver_profile")
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["caregiver_profile", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.caregiver_profile} - {self.organization} - {self.status}"
+
+
+class OrganizationClient(models.Model):
+    """
+    Junction table linking clients to organizations.
+    Clients can belong to multiple organizations.
+    """
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="client_relationships"
+    )
+
+    client_profile = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="organization_relationships"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    approved_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_clients"
+    )
+
+    approved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("organization", "client_profile")
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["client_profile", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.client_profile} - {self.organization} - {self.status}"

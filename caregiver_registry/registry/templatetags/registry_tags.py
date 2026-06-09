@@ -3,21 +3,21 @@ Template tags for registry app.
 Provides organization-related context to templates.
 """
 from django import template
-from registry.services import get_user_memberships, get_active_organization
+from registry.services import get_user_organizations, get_active_organization
 
 register = template.Library()
 
 
 @register.simple_tag
-def get_user_organizations(user):
+def get_organizations_for_user(user):
     """
-    Get all organization memberships for a user.
-    Usage: {% get_user_organizations user as user_organizations %}
+    Get all organizations for a user.
+    Usage: {% get_organizations_for_user user as user_organizations %}
     """
     if not user.is_authenticated:
         return []
     
-    return get_user_memberships(user)
+    return get_user_organizations(user)
 
 
 @register.simple_tag

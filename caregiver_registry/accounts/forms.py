@@ -1,8 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from organizations.models import Organization
-
 
 User = get_user_model()
 
@@ -54,13 +52,4 @@ class OrganizationAdminSignupForm(forms.Form):
             first_name=self.cleaned_data["first_name"],
             last_name=self.cleaned_data["last_name"],
         )
-
-        organization = Organization.objects.create(
-            name=self.cleaned_data["organization_name"],
-            city=self.cleaned_data["organization_city"],
-            zip_code=self.cleaned_data["organization_zip_code"],
-            contact_email=self.cleaned_data["organization_contact_email"],
-            primary_admin=user,
-        )
-
-        return user, organization
+        return user

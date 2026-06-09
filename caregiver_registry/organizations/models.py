@@ -4,13 +4,27 @@ import uuid
 from datetime import timedelta
 from django.utils import timezone
 
+
+STAFF_ROLE_CHOICES = [
+    ("admin", "Admin"),
+    ("staff", "Staff"),
+]
+
+
+MEMBERSHIP_STATUS_CHOICES = [
+    ("invited", "Invited"),
+    ("active", "Active"),
+    ("inactive", "Inactive"),
+]
+
+
 class Organization(models.Model):
     name = models.CharField(max_length=255)
     city = models.CharField(max_length=100)
     zip_code = models.CharField(max_length=10, blank=True)
 
     primary_admin = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "accounts.StaffProfile",
         on_delete=models.PROTECT,
         related_name="owned_organizations"
     )
@@ -20,16 +34,19 @@ class Organization(models.Model):
 
     def __str__(self):
         return self.name
-    
+
+
 # ==============================================
 # Organization Staff and Invites    
 # ==============================================
 
 class OrganizationStaff(models.Model):
-    ROLE_CHOICES = [
-        ("admin", "Admin"),
-        ("staff", "Staff"),
-    ]
+    """
+    Junction table linking staff to organizations.
+    Staff can belong to multiple organizations.
+    """
+    ROLE_CHOICES = STAFF_ROLE_CHOICES
+    STATUS_CHOICES = MEMBERSHIP_STATUS_CHOICES
 
     organization = models.ForeignKey(
         Organization,
@@ -37,25 +54,51 @@ class OrganizationStaff(models.Model):
         related_name="staff_members"
     )
 
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    staff_profile = models.ForeignKey(
+        "accounts.StaffProfile",
         on_delete=models.CASCADE,
-        related_name="organization_staff_roles"
+        related_name="organization_relationships"
     )
 
     role = models.CharField(
         max_length=20,
-        choices=ROLE_CHOICES,
+        choices=STAFF_ROLE_CHOICES,
         default="staff"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=MEMBERSHIP_STATUS_CHOICES,
+        default="active"
     )
 
     can_view_dashboard = models.BooleanField(default=True)
     can_approve_applications = models.BooleanField(default=False)
     can_invite_staff = models.BooleanField(default=False)
+    
+    invited_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="staff_invites_sent"
+    )
+    
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("organization", "staff_profile")
+        indexes = [
+            models.Index(fields=["organization", "role", "status"]),
+            models.Index(fields=["staff_profile", "status"]),
+        ]
 
     def __str__(self):
-        return f"{self.user} - {self.organization} - {self.role}"
+        return f"{self.staff_profile} - {self.organization} - {self.role}"
+
 
 # ==============================================
 # Organization Staff Invites    
@@ -63,6 +106,7 @@ class OrganizationStaff(models.Model):
 
 def default_staff_invite_expiration():
     return timezone.now() + timedelta(days=7)
+
 
 class OrganizationStaffInvite(models.Model):
     organization = models.ForeignKey(
@@ -75,7 +119,7 @@ class OrganizationStaffInvite(models.Model):
 
     role = models.CharField(
         max_length=20,
-        choices=OrganizationStaff.ROLE_CHOICES,
+        choices=STAFF_ROLE_CHOICES,
         default="staff"
     )
 
@@ -93,61 +137,3 @@ class OrganizationStaffInvite(models.Model):
 
     def __str__(self):
         return f"{self.email} invited to {self.organization}"
-
-# ==============================================
-# Organization Membership (Multi-role support)
-# ==============================================
-
-class OrganizationMembership(models.Model):
-    """
-    Links users to organizations with specific roles.
-    Supports multi-org and multi-role memberships per user.
-    """
-    ROLE_CHOICES = [
-        ("admin", "Admin"),
-        ("staff", "Staff"),
-        ("caregiver", "Caregiver"),
-        ("client", "Client"),
-    ]
-
-    STATUS_CHOICES = [
-        ("active", "Active"),
-        ("inactive", "Inactive"),
-        ("pending", "Pending"),
-    ]
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="organization_memberships"
-    )
-
-    organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,
-        related_name="memberships"
-    )
-
-    role = models.CharField(
-        max_length=20,
-        choices=ROLE_CHOICES
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default="active"
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('user', 'organization', 'role')
-        indexes = [
-            models.Index(fields=['user', 'organization']),
-            models.Index(fields=['organization', 'role', 'status']),
-        ]
-
-    def __str__(self):
-        return f"{self.user.email} - {self.organization.name} - {self.role}"

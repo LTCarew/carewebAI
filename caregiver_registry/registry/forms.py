@@ -1,8 +1,12 @@
 from django import forms
+from django.db import transaction
 from organizations.models import Organization
+from accounts.models import UserProfile
 from .models import (
-    Caregiver,
-    Client,
+    CaregiverProfile,
+    ClientProfile,
+    OrganizationCaregiver,
+    OrganizationClient,
     CONTACT_PREFERENCES,
     TRANSPORTATION_CHOICES,
     EXPERIENCE_CHOICES,
@@ -10,7 +14,11 @@ from .models import (
     PATHOGEN_PROTOCOL_CHOICES,
     ATTENDANT_PROGRAM_CHOICES,
     CARE_NEEDS_CHOICES,
+    HOURS_LOOKING_FOR_CHOICES,
+    RATE_CHOICES,
+    PRONOUN_CHOICES,
 )
+from .services import get_or_create_user_from_email
 
 
 TIME_CHOICES = [
@@ -100,79 +108,67 @@ class AvailabilityMixin:
         return availability
 
 
-class CaregiverApplicationForm(AvailabilityMixin, forms.ModelForm):
+class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
+    """
+    Form for caregiver applications.
+    Creates User, UserProfile, CaregiverProfile, and OrganizationCaregiver.
+    """
+    organization = forms.ModelChoiceField(queryset=Organization.objects.all())
+    name = forms.CharField(max_length=255)
+    phone = forms.CharField(max_length=25)
+    email = forms.EmailField()
     contact_preferences = forms.MultipleChoiceField(
         choices=CONTACT_PREFERENCES,
         widget=forms.CheckboxSelectMultiple
     )
-
+    pronouns = forms.ChoiceField(choices=PRONOUN_CHOICES, required=False)
+    
+    base_zip_code = forms.CharField(max_length=10)
     willing_to_work_cities = forms.MultipleChoiceField(
         choices=[],
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
+    
     transportation = forms.MultipleChoiceField(
         choices=TRANSPORTATION_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
+    
+    hours_looking_for = forms.ChoiceField(choices=HOURS_LOOKING_FOR_CHOICES)
+    
+    certified_ihss_worker = forms.BooleanField(required=False)
+    additional_certifications = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False
+    )
+    
     experience_with = forms.MultipleChoiceField(
         choices=EXPERIENCE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
+    
     languages_spoken = forms.MultipleChoiceField(
         choices=LANGUAGE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
+    
     pathogen_protocols = forms.MultipleChoiceField(
         choices=PATHOGEN_PROTOCOL_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
-    class Meta:
-        model = Caregiver
-        fields = [
-            "organization",
-            "name",
-            "phone",
-            "email",
-            "contact_preferences",
-            "pronouns",
-            "base_zip_code",
-            "willing_to_work_cities",
-            "transportation",
-            "hours_looking_for",
-            "certified_ihss_worker",
-            "additional_certifications",
-            "experience_with",
-            "languages_spoken",
-            "pathogen_protocols",
-            "rate",
-            "bio",
-            "availability_confirmation_agreement",
-            "wants_training_updates",
-            "other_ways_find_work",
-            "helpful_for_finding_work",
-            "release_of_liability",
-            "signed_date",
-        ]
-
-        widgets = {
-            "signed_date": forms.DateInput(attrs={"type": "date"}),
-            "bio": forms.Textarea(attrs={"rows": 4}),
-            "additional_certifications": forms.Textarea(attrs={"rows": 3}),
-        }
-
+    
+    rate = forms.ChoiceField(choices=RATE_CHOICES)
+    bio = forms.CharField(widget=forms.Textarea(attrs={"rows": 4}), required=False)
+    wants_training_updates = forms.BooleanField(required=False)
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        
         cities = (
             Organization.objects
             .exclude(city="")
@@ -180,89 +176,170 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.ModelForm):
             .distinct()
             .order_by("city")
         )
-
         self.fields["willing_to_work_cities"].choices = list(cities)
-
+        
         self.add_availability_fields()
         apply_bulma_classes(self)
+    
+    @transaction.atomic
+    def save(self):
+        """Create User, UserProfile, CaregiverProfile, and OrganizationCaregiver."""
+        # 1. Get or create User
+        user = get_or_create_user_from_email(
+            email=self.cleaned_data['email'],
+            name=self.cleaned_data['name']
+        )
+        
+        # 2. Create or update UserProfile
+        user_profile, _ = UserProfile.objects.update_or_create(
+            user=user,
+            defaults={
+                'name': self.cleaned_data['name'],
+                'phone': self.cleaned_data['phone'],
+                'email': self.cleaned_data['email'],
+                'pronouns': self.cleaned_data.get('pronouns', ''),
+                'contact_preferences': self.cleaned_data['contact_preferences'],
+            }
+        )
+        
+        # 3. Create or update CaregiverProfile
+        caregiver_profile, _ = CaregiverProfile.objects.update_or_create(
+            user_profile=user_profile,
+            defaults={
+                'base_zip_code': self.cleaned_data['base_zip_code'],
+                'willing_to_work_cities': self.cleaned_data['willing_to_work_cities'],
+                'transportation': self.cleaned_data['transportation'],
+                'availability': self.build_availability_json(),
+                'hours_looking_for': self.cleaned_data['hours_looking_for'],
+                'certified_ihss_worker': self.cleaned_data['certified_ihss_worker'],
+                'additional_certifications': self.cleaned_data.get('additional_certifications', ''),
+                'experience_with': self.cleaned_data['experience_with'],
+                'languages_spoken': self.cleaned_data['languages_spoken'],
+                'pathogen_protocols': self.cleaned_data['pathogen_protocols'],
+                'rate': self.cleaned_data['rate'],
+                'bio': self.cleaned_data.get('bio', ''),
+                'wants_training_updates': self.cleaned_data.get('wants_training_updates', False),
+            }
+        )
+        
+        # 4. Create or update OrganizationCaregiver relationship
+        org_caregiver, _ = OrganizationCaregiver.objects.update_or_create(
+            organization=self.cleaned_data['organization'],
+            caregiver_profile=caregiver_profile,
+            defaults={
+                'status': 'pending',
+            }
+        )
+        
+        return org_caregiver
 
-    def save(self, commit=True):
-        caregiver = super().save(commit=False)
-        caregiver.availability = self.build_availability_json()
 
-        if commit:
-            caregiver.save()
-
-        return caregiver
-
-
-class ClientApplicationForm(AvailabilityMixin, forms.ModelForm):
+class ClientApplicationForm(AvailabilityMixin, forms.Form):
+    """
+    Form for client applications.
+    Creates User, UserProfile, ClientProfile, and OrganizationClient.
+    """
+    organization = forms.ModelChoiceField(queryset=Organization.objects.all())
+    name = forms.CharField(max_length=255)
+    phone = forms.CharField(max_length=25)
+    email = forms.EmailField()
     contact_preferences = forms.MultipleChoiceField(
         choices=CONTACT_PREFERENCES,
         widget=forms.CheckboxSelectMultiple
     )
-
+    pronouns = forms.ChoiceField(choices=PRONOUN_CHOICES, required=False)
+    
+    address = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}))
+    base_zip_code = forms.CharField(max_length=10)
+    
     attendant_care_programs = forms.MultipleChoiceField(
         choices=ATTENDANT_PROGRAM_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
-    care_needs = forms.MultipleChoiceField(
-        choices=CARE_NEEDS_CHOICES,
-        widget=forms.CheckboxSelectMultiple,
-        required=False
-    )
-
+    
     languages_preferred = forms.MultipleChoiceField(
         choices=LANGUAGE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
+    
+    schedule_flexibility = forms.BooleanField(required=False)
+    hours_per_week = forms.IntegerField(required=False, min_value=0)
+    
+    care_needs = forms.MultipleChoiceField(
+        choices=CARE_NEEDS_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+    
+    additional_care_needs = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False
+    )
+    
+    preferences = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 4}),
+        required=False
+    )
+    
     pathogen_protocol_preferences = forms.MultipleChoiceField(
         choices=PATHOGEN_PROTOCOL_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-
-    class Meta:
-        model = Client
-        fields = [
-            "organization",
-            "name",
-            "phone",
-            "email",
-            "contact_preferences",
-            "pronouns",
-            "address",
-            "base_zip_code",
-            "attendant_care_programs",
-            "languages_preferred",
-            "schedule_flexibility",
-            "hours_per_week",
-            "care_needs",
-            "additional_care_needs",
-            "preferences",
-            "pathogen_protocol_preferences",
-        ]
-
-        widgets = {
-            "address": forms.Textarea(attrs={"rows": 3}),
-            "additional_care_needs": forms.Textarea(attrs={"rows": 3}),
-            "preferences": forms.Textarea(attrs={"rows": 4}),
-        }
-
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.add_availability_fields()
         apply_bulma_classes(self)
-
-    def save(self, commit=True):
-        client = super().save(commit=False)
-        client.availability = self.build_availability_json()
-
-        if commit:
-            client.save()
-
-        return client
+    
+    @transaction.atomic
+    def save(self):
+        """Create User, UserProfile, ClientProfile, and OrganizationClient."""
+        # 1. Get or create User
+        user = get_or_create_user_from_email(
+            email=self.cleaned_data['email'],
+            name=self.cleaned_data['name']
+        )
+        
+        # 2. Create or update UserProfile
+        user_profile, _ = UserProfile.objects.update_or_create(
+            user=user,
+            defaults={
+                'name': self.cleaned_data['name'],
+                'phone': self.cleaned_data['phone'],
+                'email': self.cleaned_data['email'],
+                'pronouns': self.cleaned_data.get('pronouns', ''),
+                'contact_preferences': self.cleaned_data['contact_preferences'],
+                'address': self.cleaned_data['address'],
+            }
+        )
+        
+        # 3. Create or update ClientProfile
+        client_profile, _ = ClientProfile.objects.update_or_create(
+            user_profile=user_profile,
+            defaults={
+                'base_zip_code': self.cleaned_data['base_zip_code'],
+                'attendant_care_programs': self.cleaned_data['attendant_care_programs'],
+                'languages_preferred': self.cleaned_data['languages_preferred'],
+                'availability': self.build_availability_json(),
+                'schedule_flexibility': self.cleaned_data.get('schedule_flexibility', False),
+                'hours_per_week': self.cleaned_data.get('hours_per_week'),
+                'care_needs': self.cleaned_data['care_needs'],
+                'additional_care_needs': self.cleaned_data.get('additional_care_needs', ''),
+                'preferences': self.cleaned_data.get('preferences', ''),
+                'pathogen_protocol_preferences': self.cleaned_data['pathogen_protocol_preferences'],
+            }
+        )
+        
+        # 4. Create or update OrganizationClient relationship
+        org_client, _ = OrganizationClient.objects.update_or_create(
+            organization=self.cleaned_data['organization'],
+            client_profile=client_profile,
+            defaults={
+                'status': 'pending',
+            }
+        )
+        
+        return org_client

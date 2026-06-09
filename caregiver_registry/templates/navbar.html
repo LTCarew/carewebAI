@@ -32,7 +32,7 @@
             {% if user.is_authenticated %}
                 <!-- Organization Switcher -->
                 {% load registry_tags %}
-                {% get_user_organizations user as user_organizations %}
+                {% get_organizations_for_user user as user_organizations %}
                 {% get_current_organization request as current_org %}
                 
                 {% if user_organizations %}
@@ -45,13 +45,12 @@
                             {% endif %}
                         </a>
                         <div class="navbar-dropdown is-right">
-                            {% for membership in user_organizations %}
+                            {% for org in user_organizations %}
                                 <a 
-                                    class="navbar-item {% if current_org and membership.organization.id == current_org.id %}is-active{% endif %}" 
-                                    href="{% url 'switch_organization' membership.organization.id %}"
+                                    class="navbar-item {% if current_org and org.id == current_org.id %}is-active{% endif %}" 
+                                    href="{% url 'switch_organization' org.id %}"
                                 >
-                                    {{ membership.organization.name }}
-                                    <span class="tag is-small ml-2">{{ membership.role|title }}</span>
+                                    {{ org.name }}
                                 </a>
                             {% endfor %}
                         </div>

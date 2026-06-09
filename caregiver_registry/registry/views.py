@@ -5,36 +5,24 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CaregiverApplicationForm, ClientApplicationForm
-from .models import Caregiver, Client
+from .models import OrganizationCaregiver, OrganizationClient
 from .services import (
-    approve_caregiver_application,
-    approve_client_application,
+    approve_caregiver,
+    approve_client,
     get_active_organization,
-    get_user_role_in_organization,
-    get_user_memberships,
-    set_active_organization,
+    get_user_primary_role,
+    user_is_admin_or_staff,
 )
 
 
-# Keep statuses centralized so update views cannot drift apart.
-ALLOWED_STATUSES = ["pending", "approved", "rejected"]
+ALLOWED_STATUSES = ["pending", "approved", "rejected", "inactive"]
 
 
 def _user_is_admin_staff(user):
     """
     Return True when the authenticated user has the admin or staff role.
-    Uses OrganizationMembership to determine role.
     """
-    if not user.is_authenticated:
-        return False
-    
-    # Check if user has admin or staff role in any organization
-    from organizations.models import OrganizationMembership
-    return OrganizationMembership.objects.filter(
-        user=user,
-        role__in=['admin', 'staff'],
-        status='active'
-    ).exists()
+    return user_is_admin_or_staff(user)
 
 
 def _redirect_if_not_admin_staff(request):
@@ -50,16 +38,12 @@ def _redirect_if_not_admin_staff(request):
 
 
 def caregiver_apply(request):
-
+    """Handle caregiver application form submission and rendering."""
     if request.method == "POST":
-
         form = CaregiverApplicationForm(request.POST)
 
         if form.is_valid():
-
-            caregiver = form.save(commit=False)
-            caregiver.status = "pending"
-            caregiver.save()
+            org_caregiver = form.save()
 
             messages.success(
                 request,
@@ -69,7 +53,6 @@ def caregiver_apply(request):
             return redirect("application_success")
 
     else:
-
         form = CaregiverApplicationForm()
 
     return render(
@@ -82,17 +65,12 @@ def caregiver_apply(request):
 
 
 def client_apply(request):
-
-    # Handles client application form submission and rendering
+    """Handle client application form submission and rendering."""
     if request.method == "POST":
-
         form = ClientApplicationForm(request.POST)
 
         if form.is_valid():
-
-            client = form.save(commit=False)
-            client.status = "pending"
-            client.save()
+            org_client = form.save()
 
             messages.success(
                 request,
@@ -101,7 +79,6 @@ def client_apply(request):
 
             return redirect("application_success")
         
-    # Handles GET request by rendering an empty client application form
     else:
         form = ClientApplicationForm()
 
@@ -124,11 +101,11 @@ def application_success(request):
 def home(request):
     return render(request, "home.html")
 
+
 @login_required
 def dashboard_redirect(request):
     """
-    Route users to appropriate dashboard based on their OrganizationMembership role.
-    Uses active organization from session or defaults to first membership.
+    Route users to appropriate dashboard based on their role in the active organization.
     """
     # Get active organization
     active_org = get_active_organization(request)
@@ -138,14 +115,14 @@ def dashboard_redirect(request):
         return redirect("home")
     
     # Get user's role in the active organization
-    role = get_user_role_in_organization(request.user, active_org)
+    role = get_user_primary_role(request.user, active_org)
     
     if not role:
         messages.warning(request, "You do not have an active role in this organization. Please contact support.")
         return redirect("home")
     
     # Route based on role
-    if role == "admin" or role == "staff":
+    if role in ["admin", "staff"]:
         return redirect("admin_dashboard")
     elif role == "caregiver":
         return redirect("caregiver_dashboard")
@@ -176,14 +153,22 @@ def registry_network(request):
         return redirect("dashboard_redirect")
 
     # Get user's role in the organization
-    user_role = get_user_role_in_organization(request.user, organization)
+    user_role = get_user_primary_role(request.user, organization)
     
     if not user_role:
         messages.warning(request, "You do not have an active role in this organization.")
         return redirect("dashboard_redirect")
 
-    caregivers = Caregiver.objects.filter(organization=organization).order_by("status", "-created_at")
-    clients = Client.objects.filter(organization=organization).order_by("status", "-created_at")
+    # Query approved caregivers and clients for this organization
+    org_caregivers = OrganizationCaregiver.objects.filter(
+        organization=organization,
+        status='approved'
+    ).select_related('caregiver_profile__user_profile').order_by('-created_at')
+    
+    org_clients = OrganizationClient.objects.filter(
+        organization=organization,
+        status='approved'
+    ).select_related('client_profile__user_profile').order_by('-created_at')
 
     selected_view = ""
     if user_role == "client":
@@ -201,13 +186,14 @@ def registry_network(request):
         "selected_view": selected_view,
         "is_admin_staff": user_role in ["admin", "staff"],
         "organization_name": organization.name,
-        "caregivers": caregivers,
-        "clients": clients,
+        "org_caregivers": org_caregivers,
+        "org_clients": org_clients,
     })
 
 
 @login_required
 def admin_dashboard(request):
+    """Admin dashboard showing pending and approved applications."""
     unauthorized_redirect = _redirect_if_not_admin_staff(request)
     if unauthorized_redirect:
         return unauthorized_redirect
@@ -217,24 +203,36 @@ def admin_dashboard(request):
     
     # Scope queries by organization if available
     if active_org:
-        caregivers = Caregiver.objects.filter(organization=active_org).order_by("status", "-created_at")
-        clients = Client.objects.filter(organization=active_org).order_by("status", "-created_at")
+        org_caregivers = OrganizationCaregiver.objects.filter(
+            organization=active_org
+        ).select_related('caregiver_profile__user_profile').order_by("status", "-created_at")
+        
+        org_clients = OrganizationClient.objects.filter(
+            organization=active_org
+        ).select_related('client_profile__user_profile').order_by("status", "-created_at")
+        
         organization_name = active_org.name
     else:
         # Fallback to all if no org (shouldn't happen for admins)
-        caregivers = Caregiver.objects.all().order_by("status", "-created_at")
-        clients = Client.objects.all().order_by("status", "-created_at")
+        org_caregivers = OrganizationCaregiver.objects.all().select_related(
+            'caregiver_profile__user_profile'
+        ).order_by("status", "-created_at")
+        
+        org_clients = OrganizationClient.objects.all().select_related(
+            'client_profile__user_profile'
+        ).order_by("status", "-created_at")
+        
         organization_name = ""
 
     full_name = request.user.get_full_name().strip() or request.user.username
 
     return render(request, "registry/admin_dashboard.html", {
-        "caregivers": caregivers,
-        "clients": clients,
-        "pending_caregivers": caregivers.filter(status="pending").count(),
-        "pending_clients": clients.filter(status="pending").count(),
-        "approved_caregivers": caregivers.filter(status="approved").count(),
-        "approved_clients": clients.filter(status="approved").count(),
+        "org_caregivers": org_caregivers,
+        "org_clients": org_clients,
+        "pending_caregivers": org_caregivers.filter(status="pending").count(),
+        "pending_clients": org_clients.filter(status="pending").count(),
+        "approved_caregivers": org_caregivers.filter(status="approved").count(),
+        "approved_clients": org_clients.filter(status="approved").count(),
         "admin_display_name": full_name,
         "admin_organization_name": organization_name,
     })
@@ -242,37 +240,52 @@ def admin_dashboard(request):
 
 @login_required
 def caregiver_detail(request, pk):
+    """Display caregiver application/profile details."""
     unauthorized_redirect = _redirect_if_not_admin_staff(request)
     if unauthorized_redirect:
         return unauthorized_redirect
 
-    caregiver = get_object_or_404(Caregiver, pk=pk)
+    org_caregiver = get_object_or_404(
+        OrganizationCaregiver.objects.select_related(
+            'caregiver_profile__user_profile',
+            'organization'
+        ),
+        pk=pk
+    )
 
     return render(request, "registry/caregiver_detail.html", {
-        "caregiver": caregiver
+        "org_caregiver": org_caregiver
     })
 
 
 @login_required
 def client_detail(request, pk):
+    """Display client application/profile details."""
     unauthorized_redirect = _redirect_if_not_admin_staff(request)
     if unauthorized_redirect:
         return unauthorized_redirect
 
-    client = get_object_or_404(Client, pk=pk)
+    org_client = get_object_or_404(
+        OrganizationClient.objects.select_related(
+            'client_profile__user_profile',
+            'organization'
+        ),
+        pk=pk
+    )
 
     return render(request, "registry/client_detail.html", {
-        "client": client
+        "org_client": org_client
     })
 
 
 @login_required
 def update_caregiver_status(request, pk, status):
+    """Update caregiver application status."""
     unauthorized_redirect = _redirect_if_not_admin_staff(request)
     if unauthorized_redirect:
         return unauthorized_redirect
 
-    caregiver = get_object_or_404(Caregiver, pk=pk)
+    org_caregiver = get_object_or_404(OrganizationCaregiver, pk=pk)
 
     # Status updates are state-changing operations, so only allow POST.
     if request.method != "POST":
@@ -282,33 +295,36 @@ def update_caregiver_status(request, pk, status):
         messages.error(request, "Invalid status.")
         return redirect("caregiver_detail", pk=pk)
 
-    # If approving, create User account and all profiles
-    if status == "approved" and caregiver.status != "approved":
+    # If approving, use the approval service
+    if status == "approved" and org_caregiver.status != "approved":
         try:
-            result = approve_caregiver_application(caregiver)
+            approve_caregiver(org_caregiver, request.user)
+            caregiver_name = org_caregiver.caregiver_profile.user_profile.name
             messages.success(
                 request, 
-                f"{caregiver.name} was approved and user account created for {result['user'].email}."
+                f"{caregiver_name} was approved."
             )
         except Exception as e:
             messages.error(request, f"Error approving application: {str(e)}")
             return redirect("caregiver_detail", pk=pk)
     else:
         # For rejected or other status changes, just update the status
-        caregiver.status = status
-        caregiver.save()
-        messages.success(request, f"{caregiver.name} was marked as {status}.")
+        org_caregiver.status = status
+        org_caregiver.save()
+        caregiver_name = org_caregiver.caregiver_profile.user_profile.name
+        messages.success(request, f"{caregiver_name} was marked as {status}.")
 
     return redirect("caregiver_detail", pk=pk)
 
 
 @login_required
 def update_client_status(request, pk, status):
+    """Update client application status."""
     unauthorized_redirect = _redirect_if_not_admin_staff(request)
     if unauthorized_redirect:
         return unauthorized_redirect
 
-    client = get_object_or_404(Client, pk=pk)
+    org_client = get_object_or_404(OrganizationClient, pk=pk)
 
     # Status updates are state-changing operations, so only allow POST.
     if request.method != "POST":
@@ -318,22 +334,24 @@ def update_client_status(request, pk, status):
         messages.error(request, "Invalid status.")
         return redirect("client_detail", pk=pk)
 
-    # If approving, create User account and all profiles
-    if status == "approved" and client.status != "approved":
+    # If approving, use the approval service
+    if status == "approved" and org_client.status != "approved":
         try:
-            result = approve_client_application(client)
+            approve_client(org_client, request.user)
+            client_name = org_client.client_profile.user_profile.name
             messages.success(
                 request, 
-                f"{client.name} was approved and user account created for {result['user'].email}."
+                f"{client_name} was approved."
             )
         except Exception as e:
             messages.error(request, f"Error approving application: {str(e)}")
             return redirect("client_detail", pk=pk)
     else:
         # For rejected or other status changes, just update the status
-        client.status = status
-        client.save()
-        messages.success(request, f"{client.name} was marked as {status}.")
+        org_client.status = status
+        org_client.save()
+        client_name = org_client.client_profile.user_profile.name
+        messages.success(request, f"{client_name} was marked as {status}.")
 
     return redirect("client_detail", pk=pk)
 
@@ -341,9 +359,12 @@ def update_client_status(request, pk, status):
 @login_required
 def switch_organization(request, org_id):
     """Switch the active organization in the user's session."""
-    success = set_active_organization(request, org_id)
+    from .services import get_user_organizations
     
-    if success:
+    user_orgs = get_user_organizations(request.user)
+    
+    if user_orgs.filter(id=org_id).exists():
+        request.session['active_organization_id'] = org_id
         messages.success(request, "Organization switched successfully.")
     else:
         messages.error(request, "You do not have access to that organization.")

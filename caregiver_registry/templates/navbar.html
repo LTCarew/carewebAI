@@ -30,6 +30,34 @@
 
         <div class="navbar-end">
             {% if user.is_authenticated %}
+                <!-- Organization Switcher -->
+                {% load registry_tags %}
+                {% get_user_organizations user as user_organizations %}
+                {% get_current_organization request as current_org %}
+                
+                {% if user_organizations %}
+                    <div class="navbar-item has-dropdown is-hoverable">
+                        <a class="navbar-link">
+                            {% if current_org %}
+                                {{ current_org.name }}
+                            {% else %}
+                                Select Organization
+                            {% endif %}
+                        </a>
+                        <div class="navbar-dropdown is-right">
+                            {% for membership in user_organizations %}
+                                <a 
+                                    class="navbar-item {% if current_org and membership.organization.id == current_org.id %}is-active{% endif %}" 
+                                    href="{% url 'switch_organization' membership.organization.id %}"
+                                >
+                                    {{ membership.organization.name }}
+                                    <span class="tag is-small ml-2">{{ membership.role|title }}</span>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+
                 <div class="navbar-item">
                     <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}

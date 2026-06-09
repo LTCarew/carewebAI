@@ -3,7 +3,7 @@ from django.contrib.auth import login
 from django.db import transaction
 from django.shortcuts import redirect, render
 
-from organizations.models import OrganizationStaff
+from organizations.models import OrganizationStaff, OrganizationMembership
 
 from .forms import OrganizationAdminSignupForm
 from .models import UserProfile
@@ -18,12 +18,23 @@ def organization_signup(request):
             with transaction.atomic():
                 user, organization = form.save()
 
+                # Create UserProfile with new structure
                 UserProfile.objects.create(
                     user=user,
-                    organization=organization,
-                    user_type="admin_staff",
+                    name=user.get_full_name() or user.username,
+                    email=user.email,
+                    phone='',  # Can be added to form if needed
                 )
 
+                # Create OrganizationMembership for admin role
+                OrganizationMembership.objects.create(
+                    user=user,
+                    organization=organization,
+                    role='admin',
+                    status='active',
+                )
+
+                # Keep OrganizationStaff for backward compatibility
                 OrganizationStaff.objects.create(
                     organization=organization,
                     user=user,

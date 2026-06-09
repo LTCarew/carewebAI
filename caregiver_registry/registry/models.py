@@ -291,3 +291,89 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# ==============================================
+# Caregiver and Client Profiles (Post-Approval)
+# ==============================================
+
+class CaregiverProfile(models.Model):
+    """
+    Created after a caregiver application is approved.
+    Stores caregiver-specific working fields.
+    """
+    from django.conf import settings
+    
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="caregiver_profile"
+    )
+
+    base_zip_code = models.CharField(max_length=10)
+    willing_to_work_cities = models.JSONField(default=list, blank=True)
+
+    transportation = models.JSONField(default=list, blank=True)
+    availability = models.JSONField(default=dict, blank=True)
+
+    hours_looking_for = models.CharField(
+        max_length=50,
+        choices=HOURS_LOOKING_FOR_CHOICES
+    )
+
+    certified_ihss_worker = models.BooleanField(default=False)
+    additional_certifications = models.TextField(blank=True)
+
+    experience_with = models.JSONField(default=list, blank=True)
+    languages_spoken = models.JSONField(default=list, blank=True)
+    pathogen_protocols = models.JSONField(default=list, blank=True)
+
+    rate = models.CharField(max_length=50, choices=RATE_CHOICES)
+
+    bio = models.TextField(blank=True)
+
+    wants_training_updates = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"CaregiverProfile: {self.user.email}"
+
+
+class ClientProfile(models.Model):
+    """
+    Created after a client application is approved.
+    Stores client-specific care needs and preferences.
+    """
+    from django.conf import settings
+    
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="client_profile"
+    )
+
+    address = models.TextField()
+    base_zip_code = models.CharField(max_length=10)
+
+    attendant_care_programs = models.JSONField(default=list, blank=True)
+
+    languages_preferred = models.JSONField(default=list, blank=True)
+
+    availability = models.JSONField(default=dict, blank=True)
+    schedule_flexibility = models.BooleanField(default=False)
+    hours_per_week = models.PositiveIntegerField(null=True, blank=True)
+
+    care_needs = models.JSONField(default=list, blank=True)
+    additional_care_needs = models.TextField(blank=True)
+
+    preferences = models.TextField(blank=True)
+
+    pathogen_protocol_preferences = models.JSONField(default=list, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"ClientProfile: {self.user.email}"

@@ -85,4 +85,10 @@ urlpatterns = [
         views.update_client_status,
         name="update_client_status"
     ),
+
+    path(
+        "switch-organization/<int:org_id>/",
+        views.switch_organization,
+        name="switch_organization"
+    ),
 ]

@@ -93,3 +93,61 @@ class OrganizationStaffInvite(models.Model):
 
     def __str__(self):
         return f"{self.email} invited to {self.organization}"
+
+# ==============================================
+# Organization Membership (Multi-role support)
+# ==============================================
+
+class OrganizationMembership(models.Model):
+    """
+    Links users to organizations with specific roles.
+    Supports multi-org and multi-role memberships per user.
+    """
+    ROLE_CHOICES = [
+        ("admin", "Admin"),
+        ("staff", "Staff"),
+        ("caregiver", "Caregiver"),
+        ("client", "Client"),
+    ]
+
+    STATUS_CHOICES = [
+        ("active", "Active"),
+        ("inactive", "Inactive"),
+        ("pending", "Pending"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="organization_memberships"
+    )
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="memberships"
+    )
+
+    role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="active"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'organization', 'role')
+        indexes = [
+            models.Index(fields=['user', 'organization']),
+            models.Index(fields=['organization', 'role', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.organization.name} - {self.role}"

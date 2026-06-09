@@ -121,3 +121,10 @@ STATICFILES_DIRS = [
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard_redirect"
 LOGOUT_REDIRECT_URL = "/"
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # For development
+DEFAULT_FROM_EMAIL = 'noreply@carewebai.org'
+
+# Site URL for invitation links
+SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")

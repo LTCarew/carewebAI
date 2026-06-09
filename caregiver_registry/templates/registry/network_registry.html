@@ -47,15 +47,15 @@ Network Registry
                         </tr>
                     </thead>
                     <tbody>
-                        {% for caregiver in caregivers %}
+                        {% for org_caregiver in org_caregivers %}
                             <tr>
-                                <td>{{ caregiver.name }}</td>
-                                <td>{{ caregiver.email }}</td>
-                                <td>{{ caregiver.phone }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.user_profile.name }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.user_profile.email }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.user_profile.phone }}</td>
                                 <td>
-                                    {% if caregiver.status == "approved" %}
+                                    {% if org_caregiver.status == "approved" %}
                                         <span class="tag is-success">Approved</span>
-                                    {% elif caregiver.status == "rejected" %}
+                                    {% elif org_caregiver.status == "rejected" %}
                                         <span class="tag is-danger">Denied</span>
                                     {% else %}
                                         <span class="tag is-warning">Pending</span>
@@ -87,15 +87,15 @@ Network Registry
                         </tr>
                     </thead>
                     <tbody>
-                        {% for client in clients %}
+                        {% for org_client in org_clients %}
                             <tr>
-                                <td>{{ client.name }}</td>
-                                <td>{{ client.email }}</td>
-                                <td>{{ client.phone }}</td>
+                                <td>{{ org_client.client_profile.user_profile.name }}</td>
+                                <td>{{ org_client.client_profile.user_profile.email }}</td>
+                                <td>{{ org_client.client_profile.user_profile.phone }}</td>
                                 <td>
-                                    {% if client.status == "approved" %}
+                                    {% if org_client.status == "approved" %}
                                         <span class="tag is-success">Approved</span>
-                                    {% elif client.status == "rejected" %}
+                                    {% elif org_client.status == "rejected" %}
                                         <span class="tag is-danger">Denied</span>
                                     {% else %}
                                         <span class="tag is-warning">Pending</span>

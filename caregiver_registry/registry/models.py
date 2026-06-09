@@ -277,8 +277,6 @@ class ClientProfile(models.Model):
     care_needs = models.JSONField(default=list, blank=True)
     additional_care_needs = models.TextField(blank=True)
 
-    preferences = models.TextField(blank=True)
-
     pathogen_protocol_preferences = models.JSONField(default=list, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -382,3 +380,173 @@ class OrganizationClient(models.Model):
 
     def __str__(self):
         return f"{self.client_profile} - {self.organization} - {self.status}"
+
+
+# ==============================================
+# Support Coordinator Models
+# ==============================================
+
+class SupportCoordinatorProfile(models.Model):
+    """
+    Profile for support coordinators who assist clients.
+    Support coordinators are invited by clients and can help manage
+    client information and caregiver relationships based on permissions.
+    """
+    user_profile = models.OneToOneField(
+        "accounts.UserProfile",
+        on_delete=models.CASCADE,
+        related_name="support_coordinator_profile"
+    )
+    
+    # Information about the coordinator
+    relationship_to_clients = models.CharField(
+        max_length=100,
+        help_text="E.g., Family member, Agency representative, Friend, etc."
+    )
+    credentials = models.TextField(
+        blank=True,
+        help_text="Professional credentials or qualifications"
+    )
+    certifications = models.TextField(
+        blank=True,
+        help_text="Relevant certifications"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Support Coordinator: {self.user_profile.name}"
+    
+    class Meta:
+        verbose_name = "Support Coordinator Profile"
+        verbose_name_plural = "Support Coordinator Profiles"
+
+
+class ClientCoordinator(models.Model):
+    """
+    Junction table linking clients with their support coordinators.
+    Includes client-controlled permissions for each coordinator.
+    """
+    client_profile = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="coordinator_relationships"
+    )
+    
+    coordinator_profile = models.ForeignKey(
+        SupportCoordinatorProfile,
+        on_delete=models.CASCADE,
+        related_name="client_relationships"
+    )
+    
+    # Client-controlled permissions
+    can_edit_profile = models.BooleanField(
+        default=False,
+        help_text="Can the coordinator edit the client's profile?"
+    )
+    can_approve_caregivers = models.BooleanField(
+        default=False,
+        help_text="Can the coordinator approve/reject caregiver matches?"
+    )
+    
+    # Relationship status
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('active', 'Active'),
+            ('inactive', 'Inactive')
+        ],
+        default='pending',
+        help_text="Status of the coordinator relationship"
+    )
+    
+    # Tracking
+    invited_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="coordinator_invitations_sent"
+    )
+    invited_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['client_profile', 'coordinator_profile']
+        verbose_name = "Client-Coordinator Relationship"
+        verbose_name_plural = "Client-Coordinator Relationships"
+        indexes = [
+            models.Index(fields=["client_profile", "status"]),
+            models.Index(fields=["coordinator_profile", "status"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.coordinator_profile.user_profile.name} → {self.client_profile.user_profile.name} ({self.status})"
+
+
+class CoordinatorInvite(models.Model):
+    """
+    Invitation for someone to become a support coordinator for a client.
+    Clients send these invitations via email with a unique token link.
+    """
+    client_profile = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="coordinator_invites"
+    )
+    
+    email = models.EmailField(help_text="Email address of the invited coordinator")
+    
+    token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text="Unique token for the invitation link"
+    )
+    
+    invited_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.CASCADE,
+        related_name="coordinator_invites_created"
+    )
+    
+    # Lifecycle tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(
+        default=default_invite_expiration,
+        help_text="Invitation expires 7 days after creation"
+    )
+    used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the invitation was accepted"
+    )
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Coordinator Invitation"
+        verbose_name_plural = "Coordinator Invitations"
+        indexes = [
+            models.Index(fields=["token"]),
+            models.Index(fields=["client_profile", "email"]),
+        ]
+    
+    def __str__(self):
+        return f"Invite for {self.email} to support {self.client_profile.user_profile.name}"
+    
+    def is_expired(self):
+        """Check if the invitation has expired."""
+        return timezone.now() > self.expires_at
+    
+    def is_used(self):
+        """Check if the invitation has been used."""
+        return self.used_at is not None
+    
+    def is_valid(self):
+        """Check if the invitation is still valid (not expired and not used)."""
+        return not self.is_expired() and not self.is_used()

@@ -58,30 +58,30 @@ urlpatterns = [
     ),
 
     path(
-        "dashboard/admin/",
-        views.admin_dashboard,
-        name="admin_dashboard"
+        "dashboard/org/",
+        views.org_dashboard,
+        name="org_dashboard"
     ),
     path(
-        "dashboard/admin/caregivers/<int:pk>/",
+        "dashboard/org/caregivers/<int:pk>/",
         views.caregiver_detail,
         name="caregiver_detail"
     ),
 
     path(
-        "dashboard/admin/clients/<int:pk>/",
+        "dashboard/org/clients/<int:pk>/",
         views.client_detail,
         name="client_detail"
     ),
 
     path(
-        "dashboard/admin/caregivers/<int:pk>/<str:status>/",
+        "dashboard/org/caregivers/<int:pk>/<str:status>/",
         views.update_caregiver_status,
         name="update_caregiver_status"
     ),
 
     path(
-        "dashboard/admin/clients/<int:pk>/<str:status>/",
+        "dashboard/org/clients/<int:pk>/<str:status>/",
         views.update_client_status,
         name="update_client_status"
     ),
@@ -90,5 +90,55 @@ urlpatterns = [
         "switch-organization/<int:org_id>/",
         views.switch_organization,
         name="switch_organization"
+    ),
+    
+    # Support Coordinator URLs
+    path(
+        "coordinator/dashboard/",
+        views.coordinator_dashboard,
+        name="coordinator_dashboard"
+    ),
+    
+    path(
+        "coordinator/signup/<uuid:token>/",
+        views.coordinator_signup,
+        name="coordinator_signup"
+    ),
+    
+    path(
+        "coordinator/invite/",
+        views.coordinator_invite_send,
+        name="coordinator_invite_send"
+    ),
+    
+    path(
+        "coordinator/permissions/<int:relationship_id>/",
+        views.coordinator_permissions_update,
+        name="coordinator_permissions_update"
+    ),
+    
+    # Pool Browsing URLs
+    path(
+        "pool/caregivers/",
+        views.caregiver_pool,
+        name="caregiver_pool"
+    ),
+    
+    path(
+        "pool/clients/",
+        views.client_pool,
+        name="client_pool"
+    ),
+    
+    path(
+        "pool/caregivers/add/<int:profile_id>/",
+        views.add_caregiver_to_org,
+        name="add_caregiver_to_org"
+    ),
+    
+    path(
+        "pool/clients/add/<int:profile_id>/",
+        views.add_client_to_org,
+        name="add_client_to_org"
     ),
 ]

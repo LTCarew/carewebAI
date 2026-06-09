@@ -1,25 +1,27 @@
 {% extends "base.html" %}
 
 {% block title %}
-Admin Dashboard
+Organization Dashboard
 {% endblock %}
 
 {% block content %}
 
 <div class="mb-5">
     <h1 class="title is-2">
-        Admin Dashboard
+        Organization Dashboard
     </h1>
 
-    <p class="mb-1">
-        <strong>Welcome:</strong> {{ admin_display_name }}
-    </p>
-
-    {% if admin_organization_name %}
-        <p class="mb-3">
-            <strong>Organization:</strong> {{ admin_organization_name }}
+    <div class="box mb-4">
+        <p class="mb-2">
+            <strong>Organization:</strong> {{ organization_name }}
         </p>
-    {% endif %}
+        <p class="mb-2">
+            <strong>User Name:</strong> {{ user_display_name }}
+        </p>
+        <p>
+            <strong>Role:</strong> {{ user_role }}
+        </p>
+    </div>
 
     <p class="subtitle">
         Review caregiver and client applications, open profile details, and manage approval status.
@@ -79,7 +81,7 @@ Admin Dashboard
                                     </td>
                                     <td>
                                         <a
-                                            href="{% url 'caregiver_detail' caregiver.pk %}"
+                                            href="{% url 'caregiver_detail' caregiver.profile_id %}"
                                             class="button is-small is-link"
                                         >
                                             View Details
@@ -153,7 +155,7 @@ Admin Dashboard
                                     </td>
                                     <td>
                                         <a
-                                            href="{% url 'client_detail' client.pk %}"
+                                            href="{% url 'client_detail' client.profile_id %}"
                                             class="button is-small is-link"
                                         >
                                             View Details

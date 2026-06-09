@@ -111,9 +111,9 @@ class AvailabilityMixin:
 class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
     """
     Form for caregiver applications.
-    Creates User, UserProfile, CaregiverProfile, and OrganizationCaregiver.
+    Creates User, UserProfile, and CaregiverProfile.
+    Applicants go into a general pool - organizations add them later.
     """
-    organization = forms.ModelChoiceField(queryset=Organization.objects.all())
     name = forms.CharField(max_length=255)
     phone = forms.CharField(max_length=25)
     email = forms.EmailField()
@@ -183,7 +183,10 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
     
     @transaction.atomic
     def save(self):
-        """Create User, UserProfile, CaregiverProfile, and OrganizationCaregiver."""
+        """
+        Create User, UserProfile, and CaregiverProfile.
+        Caregiver goes into general pool - organizations can add them later.
+        """
         # 1. Get or create User
         user = get_or_create_user_from_email(
             email=self.cleaned_data['email'],
@@ -222,24 +225,15 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
             }
         )
         
-        # 4. Create or update OrganizationCaregiver relationship
-        org_caregiver, _ = OrganizationCaregiver.objects.update_or_create(
-            organization=self.cleaned_data['organization'],
-            caregiver_profile=caregiver_profile,
-            defaults={
-                'status': 'pending',
-            }
-        )
-        
-        return org_caregiver
+        return caregiver_profile
 
 
 class ClientApplicationForm(AvailabilityMixin, forms.Form):
     """
     Form for client applications.
-    Creates User, UserProfile, ClientProfile, and OrganizationClient.
+    Creates User, UserProfile, and ClientProfile.
+    Applicants go into a general pool - organizations add them later.
     """
-    organization = forms.ModelChoiceField(queryset=Organization.objects.all())
     name = forms.CharField(max_length=255)
     phone = forms.CharField(max_length=25)
     email = forms.EmailField()
@@ -278,11 +272,6 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
         required=False
     )
     
-    preferences = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 4}),
-        required=False
-    )
-    
     pathogen_protocol_preferences = forms.MultipleChoiceField(
         choices=PATHOGEN_PROTOCOL_CHOICES,
         widget=forms.CheckboxSelectMultiple,
@@ -296,7 +285,10 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
     
     @transaction.atomic
     def save(self):
-        """Create User, UserProfile, ClientProfile, and OrganizationClient."""
+        """
+        Create User, UserProfile, and ClientProfile.
+        Client goes into general pool - organizations can add them later.
+        """
         # 1. Get or create User
         user = get_or_create_user_from_email(
             email=self.cleaned_data['email'],
@@ -328,18 +320,140 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
                 'hours_per_week': self.cleaned_data.get('hours_per_week'),
                 'care_needs': self.cleaned_data['care_needs'],
                 'additional_care_needs': self.cleaned_data.get('additional_care_needs', ''),
-                'preferences': self.cleaned_data.get('preferences', ''),
                 'pathogen_protocol_preferences': self.cleaned_data['pathogen_protocol_preferences'],
             }
         )
         
-        # 4. Create or update OrganizationClient relationship
-        org_client, _ = OrganizationClient.objects.update_or_create(
-            organization=self.cleaned_data['organization'],
-            client_profile=client_profile,
+        return client_profile
+
+
+# ==============================================
+# Support Coordinator Forms
+# ==============================================
+
+class CoordinatorInviteForm(forms.Form):
+    """
+    Form for clients to invite support coordinators.
+    Sends an email invitation with a unique signup link.
+    """
+    email = forms.EmailField(
+        label="Coordinator Email",
+        help_text="Email address of the person you want to invite as your support coordinator"
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+
+class CoordinatorSignupForm(forms.Form):
+    """
+    Form for invited coordinators to sign up and accept the invitation.
+    Creates User, UserProfile, SupportCoordinatorProfile, and ClientCoordinator records.
+    """
+    # Pre-filled from invite (read-only)
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={'readonly': 'readonly'})
+    )
+    
+    # Coordinator information
+    name = forms.CharField(max_length=255, label="Full Name")
+    phone = forms.CharField(max_length=25, label="Phone Number")
+    
+    contact_preferences = forms.MultipleChoiceField(
+        choices=CONTACT_PREFERENCES,
+        widget=forms.CheckboxSelectMultiple,
+        label="Preferred Contact Methods"
+    )
+    
+    pronouns = forms.ChoiceField(
+        choices=PRONOUN_CHOICES,
+        required=False,
+        label="Pronouns"
+    )
+    
+    # Coordinator-specific fields
+    relationship_to_clients = forms.CharField(
+        max_length=100,
+        label="Relationship to Client",
+        help_text="E.g., Family member, Friend, Agency representative, etc."
+    )
+    
+    credentials = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Professional Credentials",
+        help_text="List any relevant professional credentials or qualifications"
+    )
+    
+    certifications = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Certifications",
+        help_text="List any relevant certifications"
+    )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+    
+    @transaction.atomic
+    def save(self, invite):
+        """
+        Create User, UserProfile, SupportCoordinatorProfile, and ClientCoordinator.
+        Mark the invitation as used.
+        
+        Args:
+            invite: CoordinatorInvite instance
+        
+        Returns:
+            ClientCoordinator instance
+        """
+        from .models import SupportCoordinatorProfile, ClientCoordinator
+        from django.utils import timezone
+        
+        # 1. Get or create User
+        user = get_or_create_user_from_email(
+            email=self.cleaned_data['email'],
+            name=self.cleaned_data['name']
+        )
+        
+        # 2. Create or update UserProfile
+        user_profile, _ = UserProfile.objects.update_or_create(
+            user=user,
             defaults={
-                'status': 'pending',
+                'name': self.cleaned_data['name'],
+                'phone': self.cleaned_data['phone'],
+                'email': self.cleaned_data['email'],
+                'pronouns': self.cleaned_data.get('pronouns', ''),
+                'contact_preferences': self.cleaned_data['contact_preferences'],
             }
         )
         
-        return org_client
+        # 3. Create or update SupportCoordinatorProfile
+        coordinator_profile, _ = SupportCoordinatorProfile.objects.update_or_create(
+            user_profile=user_profile,
+            defaults={
+                'relationship_to_clients': self.cleaned_data['relationship_to_clients'],
+                'credentials': self.cleaned_data.get('credentials', ''),
+                'certifications': self.cleaned_data.get('certifications', ''),
+            }
+        )
+        
+        # 4. Create ClientCoordinator relationship
+        client_coordinator, _ = ClientCoordinator.objects.update_or_create(
+            client_profile=invite.client_profile,
+            coordinator_profile=coordinator_profile,
+            defaults={
+                'status': 'active',  # Auto-active since they accepted invite
+                'invited_by': invite.invited_by,
+                'accepted_at': timezone.now(),
+            }
+        )
+        
+        # 5. Mark invitation as used
+        invite.used_at = timezone.now()
+        invite.save()
+        
+        return client_coordinator

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}
+Client Pool - {{ organization.name }}
+{% endblock %}
+
+{% block content %}
+
+<div class="mb-5">
+    <h1 class="title is-2">
+        Browse Client Pool
+    </h1>
+    <p class="subtitle">
+        Add clients from the general pool to {{ organization.name }}
+    </p>
+    <a href="{% url 'admin_dashboard' %}" class="button is-light">
+        ← Back to Dashboard
+    </a>
+</div>
+
+<div class="card app-card">
+    <div class="card-content">
+        <h2 class="title is-4">Available Clients</h2>
+        
+        <div class="table-container">
+            <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>ZIP Code</th>
+                        <th>Hours/Week</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                
+                <tbody>
+                    {% for client in clients %}
+                        <tr>
+                            <td>{{ client.user_profile.name }}</td>
+                            <td>{{ client.user_profile.email }}</td>
+                            <td>{{ client.base_zip_code }}</td>
+                            <td>{{ client.hours_per_week|default:"N/A" }}</td>
+                            <td>
+                                <a 
+                                    href="{% url 'add_client_to_org' client.id %}" 
+                                    class="button is-small is-success"
+                                >
+                                    <span class="icon">
+                                        <i class="fas fa-plus"></i>
+                                    </span>
+                                    <span>Add to Organization</span>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                No available clients in the pool. All clients have already been added to your organization.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

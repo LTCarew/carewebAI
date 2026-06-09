@@ -15,7 +15,7 @@ Client Review
         </div>
     </div>
     <div class="level-right">
-        <a href="{% url 'admin_dashboard' %}" class="button is-light">Back to Dashboard</a>
+        <a href="{% url 'org_dashboard' %}" class="button is-light">Back to Dashboard</a>
     </div>
 </div>
 
@@ -25,9 +25,9 @@ Client Review
         <div class="level-left">
             <div>
                 <p class="heading">Current Status</p>
-                {% if client.status == "approved" %}
+                {% if org_client.status == "approved" %}
                     <span class="tag is-success is-medium">Approved</span>
-                {% elif client.status == "rejected" %}
+                {% elif org_client.status == "rejected" %}
                     <span class="tag is-danger is-medium">Rejected</span>
                 {% else %}
                     <span class="tag is-warning is-medium">Pending</span>
@@ -37,17 +37,17 @@ Client Review
 
         <div class="level-right">
             <div class="buttons">
-                <form method="post" action="{% url 'update_client_status' client.pk 'approved' %}">
+                <form method="post" action="{% url 'update_client_status' org_client.pk 'approved' %}">
                     {% csrf_token %}
                     <button type="submit" class="button is-success">Approve</button>
                 </form>
 
-                <form method="post" action="{% url 'update_client_status' client.pk 'rejected' %}">
+                <form method="post" action="{% url 'update_client_status' org_client.pk 'rejected' %}">
                     {% csrf_token %}
                     <button type="submit" class="button is-danger">Reject</button>
                 </form>
 
-                <form method="post" action="{% url 'update_client_status' client.pk 'pending' %}">
+                <form method="post" action="{% url 'update_client_status' org_client.pk 'pending' %}">
                     {% csrf_token %}
                     <button type="submit" class="button is-warning is-light">Mark Pending</button>
                 </form>
@@ -62,14 +62,14 @@ Client Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Identity & Contact</h2>
-                <p><strong>Name:</strong> {{ client.name }}</p>
-                <p><strong>Email:</strong> {{ client.email }}</p>
-                <p><strong>Phone:</strong> {{ client.phone }}</p>
-                <p><strong>Pronouns:</strong> {{ client.pronouns|default:"Not provided" }}</p>
-                <p><strong>Contact preferences:</strong> {{ client.contact_preferences|join:", "|default:"None selected" }}</p>
-                <p><strong>Organization:</strong> {{ client.organization.name }}</p>
-                <p><strong>Address:</strong> {{ client.address }}</p>
-                <p><strong>Base ZIP:</strong> {{ client.base_zip_code }}</p>
+                <p><strong>Name:</strong> {{ org_client.client_profile.user_profile.name }}</p>
+                <p><strong>Email:</strong> {{ org_client.client_profile.user_profile.email }}</p>
+                <p><strong>Phone:</strong> {{ org_client.client_profile.user_profile.phone }}</p>
+                <p><strong>Pronouns:</strong> {{ org_client.client_profile.user_profile.get_pronouns_display|default:"Not provided" }}</p>
+                <p><strong>Contact preferences:</strong> {{ org_client.client_profile.user_profile.contact_preferences|join:", "|default:"None selected" }}</p>
+                <p><strong>Organization:</strong> {{ org_client.organization.name }}</p>
+                <p><strong>Address:</strong> {{ org_client.client_profile.user_profile.address }}</p>
+                <p><strong>Base ZIP:</strong> {{ org_client.client_profile.base_zip_code }}</p>
             </div>
         </div>
     </div>
@@ -79,10 +79,10 @@ Client Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Programs & Language</h2>
-                <p><strong>Attendant care programs:</strong> {{ client.attendant_care_programs|join:", "|default:"None selected" }}</p>
-                <p><strong>Preferred languages:</strong> {{ client.languages_preferred|join:", "|default:"None selected" }}</p>
-                <p><strong>Hours per week:</strong> {{ client.hours_per_week|default:"Not specified" }}</p>
-                <p><strong>Schedule flexibility:</strong> {{ client.schedule_flexibility|yesno:"Yes,No" }}</p>
+                <p><strong>Attendant care programs:</strong> {{ org_client.client_profile.attendant_care_programs|join:", "|default:"None selected" }}</p>
+                <p><strong>Preferred languages:</strong> {{ org_client.client_profile.languages_preferred|join:", "|default:"None selected" }}</p>
+                <p><strong>Hours per week:</strong> {{ org_client.client_profile.hours_per_week|default:"Not specified" }}</p>
+                <p><strong>Schedule flexibility:</strong> {{ org_client.client_profile.schedule_flexibility|yesno:"Yes,No" }}</p>
             </div>
         </div>
     </div>
@@ -92,9 +92,9 @@ Client Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Availability</h2>
-                {% if client.availability %}
+                {% if org_client.client_profile.availability %}
                     <ul>
-                        {% for day, hours in client.availability.items %}
+                        {% for day, hours in org_client.client_profile.availability.items %}
                             <li><strong>{{ day|title }}:</strong> {{ hours.start }} – {{ hours.end }}</li>
                         {% endfor %}
                     </ul>
@@ -110,10 +110,9 @@ Client Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Care Needs & Protocols</h2>
-                <p><strong>Care needs:</strong> {{ client.care_needs|join:", "|default:"None selected" }}</p>
-                <p><strong>Additional care needs:</strong> {{ client.additional_care_needs|default:"Not provided" }}</p>
-                <p><strong>Pathogen protocol preferences:</strong> {{ client.pathogen_protocol_preferences|join:", "|default:"None selected" }}</p>
-                <p><strong>Preferences:</strong> {{ client.preferences|default:"Not provided" }}</p>
+                <p><strong>Care needs:</strong> {{ org_client.client_profile.care_needs|join:", "|default:"None selected" }}</p>
+                <p><strong>Additional care needs:</strong> {{ org_client.client_profile.additional_care_needs|default:"Not provided" }}</p>
+                <p><strong>Pathogen protocol preferences:</strong> {{ org_client.client_profile.pathogen_protocol_preferences|join:", "|default:"None selected" }}</p>
             </div>
         </div>
     </div>
@@ -123,8 +122,8 @@ Client Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Metadata</h2>
-                <p><strong>Profile completed:</strong> {{ client.profile_completed|yesno:"Yes,No" }}</p>
-                <p><strong>Created at:</strong> {{ client.created_at }}</p>
+                <p><strong>Profile completed:</strong> {{ org_client.client_profile.profile_completed|yesno:"Yes,No" }}</p>
+                <p><strong>Created at:</strong> {{ org_client.created_at }}</p>
             </div>
         </div>
     </div>

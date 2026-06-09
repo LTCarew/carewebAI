@@ -75,6 +75,27 @@ textarea {
     }
 }
 
+/* Organization dropdown styling to match navbar */
+.app-navbar .navbar-dropdown {
+    background-color: var(--app-primary-dark);
+    border-top: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.app-navbar .navbar-dropdown .navbar-item {
+    color: #fff;
+}
+
+.app-navbar .navbar-dropdown .navbar-item:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+.app-navbar .navbar-dropdown .navbar-item.is-active {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    font-weight: 800;
+}
+
 .app-logo {
     font-size: 1.2rem;
     font-weight: 800;

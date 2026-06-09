@@ -212,6 +212,159 @@ def user_has_access_to_organization(user, organization):
     return False
 
 
+# ==============================================
+# Support Coordinator Helper Functions
+# ==============================================
+
+def get_coordinator_clients(coordinator_profile):
+    """
+    Get all clients that a support coordinator is assisting.
+    
+    Args:
+        coordinator_profile: SupportCoordinatorProfile instance
+    
+    Returns:
+        QuerySet of ClientCoordinator instances (active relationships)
+    """
+    from .models import ClientCoordinator
+    
+    return ClientCoordinator.objects.filter(
+        coordinator_profile=coordinator_profile,
+        status='active'
+    ).select_related(
+        'client_profile__user_profile'
+    ).order_by('-created_at')
+
+
+def get_client_coordinators(client_profile):
+    """
+    Get all support coordinators for a client.
+    
+    Args:
+        client_profile: ClientProfile instance
+    
+    Returns:
+        QuerySet of ClientCoordinator instances
+    """
+    from .models import ClientCoordinator
+    
+    return ClientCoordinator.objects.filter(
+        client_profile=client_profile
+    ).select_related(
+        'coordinator_profile__user_profile'
+    ).order_by('-created_at')
+
+
+def coordinator_can_edit(client_coordinator):
+    """
+    Check if a coordinator has permission to edit a client's profile.
+    
+    Args:
+        client_coordinator: ClientCoordinator instance
+    
+    Returns:
+        bool: True if coordinator can edit
+    """
+    return (
+        client_coordinator.status == 'active' and 
+        client_coordinator.can_edit_profile
+    )
+
+
+def coordinator_can_approve(client_coordinator):
+    """
+    Check if a coordinator has permission to approve caregivers for a client.
+    
+    Args:
+        client_coordinator: ClientCoordinator instance
+    
+    Returns:
+        bool: True if coordinator can approve caregivers
+    """
+    return (
+        client_coordinator.status == 'active' and 
+        client_coordinator.can_approve_caregivers
+    )
+
+
+def send_coordinator_invite(client_profile, email, invited_by_user):
+    """
+    Create a coordinator invitation and send email.
+    
+    Args:
+        client_profile: ClientProfile instance
+        email: Email address to send invitation to
+        invited_by_user: User instance who is sending the invite
+    
+    Returns:
+        CoordinatorInvite instance
+    """
+    from .models import CoordinatorInvite
+    from django.core.mail import send_mail
+    from django.conf import settings
+    from django.urls import reverse
+    
+    # Create the invitation
+    invite = CoordinatorInvite.objects.create(
+        client_profile=client_profile,
+        email=email,
+        invited_by=invited_by_user.profile
+    )
+    
+    # Build the signup URL with token
+    signup_url = f"{settings.SITE_URL}{reverse('coordinator_signup', kwargs={'token': invite.token})}"
+    
+    # Send email
+    subject = f"Invitation to be a Support Coordinator for {client_profile.user_profile.name}"
+    message = f"""
+Hello,
+
+{client_profile.user_profile.name} has invited you to be their Support Coordinator on CareWeb AI.
+
+As a Support Coordinator, you can help manage care needs and assist with finding caregivers.
+
+To accept this invitation and create your account, please click the link below:
+
+{signup_url}
+
+This invitation will expire in 7 days.
+
+If you have any questions, please contact us.
+
+Best regards,
+The CareWeb AI Team
+    """.strip()
+    
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+    
+    return invite
+
+
+def get_user_coordinator_role(user):
+    """
+    Check if user is a support coordinator and return their profile if so.
+    
+    Args:
+        user: User instance
+    
+    Returns:
+        SupportCoordinatorProfile instance or None
+    """
+    try:
+        user_profile = user.profile
+        if hasattr(user_profile, 'support_coordinator_profile'):
+            return user_profile.support_coordinator_profile
+    except (UserProfile.DoesNotExist, AttributeError):
+        pass
+    return None
+
+
 def get_user_organizations(user):
     """
     Get all organizations the user has access to.

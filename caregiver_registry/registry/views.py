@@ -316,23 +316,65 @@ def registry_network(request):
         messages.warning(request, "You do not have an active role in this organization.")
         return redirect("dashboard_redirect")
 
-    # Query approved caregivers and clients for this organization
-    org_caregivers = OrganizationCaregiver.objects.filter(
-        organization=organization,
-        status='approved'
-    ).select_related('caregiver_profile__user_profile').order_by('-created_at')
-    
-    org_clients = OrganizationClient.objects.filter(
-        organization=organization,
-        status='approved'
-    ).select_related('client_profile__user_profile').order_by('-created_at')
-
-    selected_view = ""
+    # Query caregivers and clients based on role and shared organizations
     if user_role == "client":
-        selected_view = "caregivers"
+        # Client sees caregivers from ALL their approved organizations
+        try:
+            client_profile = request.user.profile.client_profile
+            # Get all orgs this client is approved in
+            client_org_ids = OrganizationClient.objects.filter(
+                client_profile=client_profile,
+                status='approved'
+            ).values_list('organization_id', flat=True)
+            
+            # Show caregivers approved in those same orgs
+            org_caregivers = OrganizationCaregiver.objects.filter(
+                organization_id__in=client_org_ids,
+                status='approved'
+            ).select_related('caregiver_profile__user_profile', 'organization').order_by('-created_at').distinct()
+            
+            org_clients = OrganizationClient.objects.none()
+            selected_view = "caregivers"
+            
+        except (AttributeError, Exception):
+            messages.error(request, "Could not load caregiver registry.")
+            return redirect("dashboard_redirect")
+            
     elif user_role == "caregiver":
-        selected_view = "clients"
+        # Caregiver sees clients from ALL their approved organizations
+        try:
+            caregiver_profile = request.user.profile.caregiver_profile
+            # Get all orgs this caregiver is approved in
+            caregiver_org_ids = OrganizationCaregiver.objects.filter(
+                caregiver_profile=caregiver_profile,
+                status='approved'
+            ).values_list('organization_id', flat=True)
+            
+            # Show clients approved in those same orgs
+            org_clients = OrganizationClient.objects.filter(
+                organization_id__in=caregiver_org_ids,
+                status='approved'
+            ).select_related('client_profile__user_profile', 'organization').order_by('-created_at').distinct()
+            
+            org_caregivers = OrganizationCaregiver.objects.none()
+            selected_view = "clients"
+            
+        except (AttributeError, Exception):
+            messages.error(request, "Could not load client registry.")
+            return redirect("dashboard_redirect")
+            
     elif user_role in ["admin", "staff"]:
+        # Admin/staff see everyone in their active organization only
+        org_caregivers = OrganizationCaregiver.objects.filter(
+            organization=organization,
+            status='approved'
+        ).select_related('caregiver_profile__user_profile').order_by('-created_at')
+        
+        org_clients = OrganizationClient.objects.filter(
+            organization=organization,
+            status='approved'
+        ).select_related('client_profile__user_profile').order_by('-created_at')
+        
         requested_view = request.GET.get("view", "clients")
         selected_view = requested_view if requested_view in ["clients", "caregivers"] else "clients"
     else:
@@ -452,6 +494,11 @@ def caregiver_detail(request, pk):
             'caregiver_profile__user_profile',
             'organization'
         ).get(pk=pk)
+        
+        # IMPORTANT: Verify it belongs to the active organization
+        if org_caregiver.organization != active_org:
+            raise OrganizationCaregiver.DoesNotExist
+            
     except OrganizationCaregiver.DoesNotExist:
         # Maybe pk is actually a profile_id, create the relationship
         caregiver_profile = get_object_or_404(CaregiverProfile, pk=pk)
@@ -486,6 +533,11 @@ def client_detail(request, pk):
             'client_profile__user_profile',
             'organization'
         ).get(pk=pk)
+        
+        # IMPORTANT: Verify it belongs to the active organization
+        if org_client.organization != active_org:
+            raise OrganizationClient.DoesNotExist
+            
     except OrganizationClient.DoesNotExist:
         # Maybe pk is actually a profile_id, create the relationship
         client_profile = get_object_or_404(ClientProfile, pk=pk)

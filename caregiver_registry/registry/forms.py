@@ -1,5 +1,6 @@
 from django import forms
 from django.db import transaction
+from django.contrib.auth import get_user_model
 from organizations.models import Organization
 from accounts.models import UserProfile
 from .models import (
@@ -19,6 +20,8 @@ from .models import (
     PRONOUN_CHOICES,
 )
 from .services import get_or_create_user_from_email
+
+User = get_user_model()
 
 
 TIME_CHOICES = [
@@ -114,7 +117,25 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
     Creates User, UserProfile, and CaregiverProfile.
     Applicants go into a general pool - organizations add them later.
     """
+    # Account credentials
     name = forms.CharField(max_length=255)
+    username = forms.CharField(
+        max_length=150,
+        help_text="Choose a username for your account"
+    )
+    password1 = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput,
+        help_text="Choose a secure password"
+    )
+    password2 = forms.CharField(
+        label="Confirm Password",
+        widget=forms.PasswordInput,
+        help_text="Enter the same password again"
+    )
+    
+    # Personal information
+    
     phone = forms.CharField(max_length=25)
     email = forms.EmailField()
     contact_preferences = forms.MultipleChoiceField(
@@ -181,48 +202,71 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
         self.add_availability_fields()
         apply_bulma_classes(self)
     
+    def clean_username(self):
+        """Validate that username is unique."""
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("This username is already taken. Please choose another.")
+        return username
+    
+    def clean_email(self):
+        """Validate that email is unique."""
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("An account with this email already exists.")
+        return email
+    
+    def clean(self):
+        """Validate that passwords match."""
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get('password1')
+        password2 = cleaned_data.get('password2')
+        
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("The two password fields must match.")
+        
+        return cleaned_data
+    
     @transaction.atomic
     def save(self):
         """
-        Create User, UserProfile, and CaregiverProfile.
-        Caregiver goes into general pool - organizations can add them later.
+        Create User (inactive), UserProfile, and CaregiverProfile.
+        User cannot login until approved by at least one organization.
         """
-        # 1. Get or create User
-        user = get_or_create_user_from_email(
+        # 1. Create User with is_active=False
+        user = User.objects.create_user(
+            username=self.cleaned_data['username'],
             email=self.cleaned_data['email'],
-            name=self.cleaned_data['name']
+            password=self.cleaned_data['password1'],
+            is_active=False  # Cannot login until approved
         )
         
-        # 2. Create or update UserProfile
-        user_profile, _ = UserProfile.objects.update_or_create(
+        # 2. Create UserProfile
+        user_profile = UserProfile.objects.create(
             user=user,
-            defaults={
-                'name': self.cleaned_data['name'],
-                'phone': self.cleaned_data['phone'],
-                'email': self.cleaned_data['email'],
-                'pronouns': self.cleaned_data.get('pronouns', ''),
-                'contact_preferences': self.cleaned_data['contact_preferences'],
-            }
+            name=self.cleaned_data['name'],
+            phone=self.cleaned_data['phone'],
+            email=self.cleaned_data['email'],
+            pronouns=self.cleaned_data.get('pronouns', ''),
+            contact_preferences=self.cleaned_data['contact_preferences'],
         )
         
-        # 3. Create or update CaregiverProfile
-        caregiver_profile, _ = CaregiverProfile.objects.update_or_create(
+        # 3. Create CaregiverProfile
+        caregiver_profile = CaregiverProfile.objects.create(
             user_profile=user_profile,
-            defaults={
-                'base_zip_code': self.cleaned_data['base_zip_code'],
-                'willing_to_work_cities': self.cleaned_data['willing_to_work_cities'],
-                'transportation': self.cleaned_data['transportation'],
-                'availability': self.build_availability_json(),
-                'hours_looking_for': self.cleaned_data['hours_looking_for'],
-                'certified_ihss_worker': self.cleaned_data['certified_ihss_worker'],
-                'additional_certifications': self.cleaned_data.get('additional_certifications', ''),
-                'experience_with': self.cleaned_data['experience_with'],
-                'languages_spoken': self.cleaned_data['languages_spoken'],
-                'pathogen_protocols': self.cleaned_data['pathogen_protocols'],
-                'rate': self.cleaned_data['rate'],
-                'bio': self.cleaned_data.get('bio', ''),
-                'wants_training_updates': self.cleaned_data.get('wants_training_updates', False),
-            }
+            base_zip_code=self.cleaned_data['base_zip_code'],
+            willing_to_work_cities=self.cleaned_data['willing_to_work_cities'],
+            transportation=self.cleaned_data['transportation'],
+            availability=self.build_availability_json(),
+            hours_looking_for=self.cleaned_data['hours_looking_for'],
+            certified_ihss_worker=self.cleaned_data['certified_ihss_worker'],
+            additional_certifications=self.cleaned_data.get('additional_certifications', ''),
+            experience_with=self.cleaned_data['experience_with'],
+            languages_spoken=self.cleaned_data['languages_spoken'],
+            pathogen_protocols=self.cleaned_data['pathogen_protocols'],
+            rate=self.cleaned_data['rate'],
+            bio=self.cleaned_data.get('bio', ''),
+            wants_training_updates=self.cleaned_data.get('wants_training_updates', False),
         )
         
         return caregiver_profile
@@ -234,7 +278,25 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
     Creates User, UserProfile, and ClientProfile.
     Applicants go into a general pool - organizations add them later.
     """
+    # Account credentials
     name = forms.CharField(max_length=255)
+    username = forms.CharField(
+        max_length=150,
+        help_text="Choose a username for your account"
+    )
+    password1 = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput,
+        help_text="Choose a secure password"
+    )
+    password2 = forms.CharField(
+        label="Confirm Password",
+        widget=forms.PasswordInput,
+        help_text="Enter the same password again"
+    )
+    
+    # Personal information
+    
     phone = forms.CharField(max_length=25)
     email = forms.EmailField()
     contact_preferences = forms.MultipleChoiceField(
@@ -283,45 +345,68 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
         self.add_availability_fields()
         apply_bulma_classes(self)
     
+    def clean_username(self):
+        """Validate that username is unique."""
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("This username is already taken. Please choose another.")
+        return username
+    
+    def clean_email(self):
+        """Validate that email is unique."""
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("An account with this email already exists.")
+        return email
+    
+    def clean(self):
+        """Validate that passwords match."""
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get('password1')
+        password2 = cleaned_data.get('password2')
+        
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("The two password fields must match.")
+        
+        return cleaned_data
+    
     @transaction.atomic
     def save(self):
         """
-        Create User, UserProfile, and ClientProfile.
-        Client goes into general pool - organizations can add them later.
+        Create User (inactive), UserProfile, and ClientProfile.
+        User cannot login until approved by at least one organization.
         """
-        # 1. Get or create User
-        user = get_or_create_user_from_email(
+        # 1. Create User with is_active=False
+        user = User.objects.create_user(
+            username=self.cleaned_data['username'],
             email=self.cleaned_data['email'],
-            name=self.cleaned_data['name']
+            password=self.cleaned_data['password1'],
+            is_active=False  # Cannot login until approved
         )
         
-        # 2. Create or update UserProfile
-        user_profile, _ = UserProfile.objects.update_or_create(
+        # 2. Create UserProfile
+        user_profile = UserProfile.objects.create(
             user=user,
-            defaults={
-                'name': self.cleaned_data['name'],
-                'phone': self.cleaned_data['phone'],
-                'email': self.cleaned_data['email'],
-                'pronouns': self.cleaned_data.get('pronouns', ''),
-                'contact_preferences': self.cleaned_data['contact_preferences'],
-                'address': self.cleaned_data['address'],
-            }
+            name=self.cleaned_data['name'],
+            phone=self.cleaned_data['phone'],
+            email=self.cleaned_data['email'],
+            pronouns=self.cleaned_data.get('pronouns', ''),
+            contact_preferences=self.cleaned_data['contact_preferences'],
+            address=self.cleaned_data['address'],
         )
         
-        # 3. Create or update ClientProfile
-        client_profile, _ = ClientProfile.objects.update_or_create(
+        # 3. Create ClientProfile
+        client_profile = ClientProfile.objects.create(
             user_profile=user_profile,
-            defaults={
-                'base_zip_code': self.cleaned_data['base_zip_code'],
-                'attendant_care_programs': self.cleaned_data['attendant_care_programs'],
-                'languages_preferred': self.cleaned_data['languages_preferred'],
-                'availability': self.build_availability_json(),
-                'schedule_flexibility': self.cleaned_data.get('schedule_flexibility', False),
-                'hours_per_week': self.cleaned_data.get('hours_per_week'),
-                'care_needs': self.cleaned_data['care_needs'],
-                'additional_care_needs': self.cleaned_data.get('additional_care_needs', ''),
-                'pathogen_protocol_preferences': self.cleaned_data['pathogen_protocol_preferences'],
-            }
+            base_zip_code=self.cleaned_data['base_zip_code'],
+            attendant_care_programs=self.cleaned_data['attendant_care_programs'],
+            languages_preferred=self.cleaned_data['languages_preferred'],
+            availability=self.build_availability_json(),
+            schedule_flexibility=self.cleaned_data.get('schedule_flexibility', False),
+            hours_per_week=self.cleaned_data.get('hours_per_week'),
+            care_needs=self.cleaned_data['care_needs'],
+            additional_care_needs=self.cleaned_data.get('additional_care_needs', ''),
+            pathogen_protocol_preferences=self.cleaned_data['pathogen_protocol_preferences'],
         )
         
         return client_profile

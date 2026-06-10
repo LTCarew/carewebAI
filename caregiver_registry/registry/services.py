@@ -418,6 +418,7 @@ def get_user_organizations(user):
 def approve_caregiver(org_caregiver, approved_by_user):
     """
     Approve a caregiver's application to join an organization.
+    Activates the user account and sends approval email.
     
     Args:
         org_caregiver: OrganizationCaregiver instance
@@ -435,6 +436,15 @@ def approve_caregiver(org_caregiver, approved_by_user):
         pass
     
     org_caregiver.save()
+    
+    # Activate user account (allow login)
+    user = org_caregiver.caregiver_profile.user_profile.user
+    user.is_active = True
+    user.save()
+    
+    # Send approval email
+    send_approval_email(org_caregiver)
+    
     return org_caregiver
 
 
@@ -442,6 +452,7 @@ def approve_caregiver(org_caregiver, approved_by_user):
 def approve_client(org_client, approved_by_user):
     """
     Approve a client's application to join an organization.
+    Activates the user account and sends approval email.
     
     Args:
         org_client: OrganizationClient instance
@@ -459,7 +470,78 @@ def approve_client(org_client, approved_by_user):
         pass
     
     org_client.save()
+    
+    # Activate user account (allow login)
+    user = org_client.client_profile.user_profile.user
+    user.is_active = True
+    user.save()
+    
+    # Send approval email
+    send_approval_email(org_client)
+    
     return org_client
+
+
+def send_approval_email(org_relationship):
+    """
+    Send email when user is approved by an organization.
+    Notifies them they can now login.
+    
+    Args:
+        org_relationship: OrganizationCaregiver or OrganizationClient instance
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+    from django.template.loader import render_to_string
+    
+    # Determine if this is a caregiver or client
+    is_caregiver = isinstance(org_relationship, OrganizationCaregiver)
+    
+    if is_caregiver:
+        user_profile = org_relationship.caregiver_profile.user_profile
+        role_name = "Caregiver"
+    else:
+        user_profile = org_relationship.client_profile.user_profile
+        role_name = "Client"
+    
+    user = user_profile.user
+    organization = org_relationship.organization
+    
+    # Build the login URL
+    login_url = f"{settings.SITE_URL}/accounts/login/"
+    
+    # Email subject
+    subject = f"Your {role_name} Application Has Been Approved - CareWeb AI"
+    
+    # Email body
+    message = f"""Hello {user_profile.name},
+
+Great news! {organization.name} has approved your {role_name.lower()} application on CareWeb AI.
+
+You can now login to your account and access the caregiver/client registry:
+
+Login URL: {login_url}
+Username: {user.username}
+
+Once logged in, you'll be able to:
+- View your dashboard
+- Browse the {"client" if is_caregiver else "caregiver"} registry
+- Connect with potential {"clients" if is_caregiver else "caregivers"}
+
+Welcome to the CareWeb AI network!
+
+Best regards,
+The CareWeb AI Team
+""".strip()
+    
+    # Send the email
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user_profile.email],
+        fail_silently=False,
+    )
 
 
 def user_is_admin_or_staff(user):

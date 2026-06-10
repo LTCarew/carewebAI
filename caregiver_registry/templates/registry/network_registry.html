@@ -40,31 +40,33 @@ Network Registry
                 <table class="table is-fullwidth is-striped is-hoverable">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Status</th>
+                            <th>Full Name</th>
+                            <th>Language</th>
+                            <th>Payment Source</th>
+                            <th>Hourly Rate</th>
+                            <th>Location</th>
+                            <th>Transportation</th>
+                            <th>Details</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for org_caregiver in org_caregivers %}
                             <tr>
                                 <td>{{ org_caregiver.caregiver_profile.user_profile.name }}</td>
-                                <td>{{ org_caregiver.caregiver_profile.user_profile.email }}</td>
-                                <td>{{ org_caregiver.caregiver_profile.user_profile.phone }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.languages_spoken|join:", "|default:"N/A" }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.attendant_care_programs|join:", "|default:"N/A" }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.get_rate_display }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.base_zip_code }}</td>
+                                <td>{{ org_caregiver.caregiver_profile.transportation|join:", "|default:"N/A" }}</td>
                                 <td>
-                                    {% if org_caregiver.status == "approved" %}
-                                        <span class="tag is-success">Approved</span>
-                                    {% elif org_caregiver.status == "rejected" %}
-                                        <span class="tag is-danger">Denied</span>
-                                    {% else %}
-                                        <span class="tag is-warning">Pending</span>
-                                    {% endif %}
+                                    <a href="{% url 'caregiver_detail' org_caregiver.pk %}" class="button is-small is-link">
+                                        View Details
+                                    </a>
                                 </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="4">No caregivers found in this network.</td>
+                                <td colspan="7">No caregivers found in this network.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -80,31 +82,29 @@ Network Registry
                 <table class="table is-fullwidth is-striped is-hoverable">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Status</th>
+                            <th>Full Name</th>
+                            <th>Language</th>
+                            <th>Payment Source</th>
+                            <th>Location</th>
+                            <th>Details</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for org_client in org_clients %}
                             <tr>
                                 <td>{{ org_client.client_profile.user_profile.name }}</td>
-                                <td>{{ org_client.client_profile.user_profile.email }}</td>
-                                <td>{{ org_client.client_profile.user_profile.phone }}</td>
+                                <td>{{ org_client.client_profile.languages_preferred|join:", "|default:"N/A" }}</td>
+                                <td>{{ org_client.client_profile.attendant_care_programs|join:", "|default:"N/A" }}</td>
+                                <td>{{ org_client.client_profile.base_zip_code }}</td>
                                 <td>
-                                    {% if org_client.status == "approved" %}
-                                        <span class="tag is-success">Approved</span>
-                                    {% elif org_client.status == "rejected" %}
-                                        <span class="tag is-danger">Denied</span>
-                                    {% else %}
-                                        <span class="tag is-warning">Pending</span>
-                                    {% endif %}
+                                    <a href="{% url 'client_detail' org_client.pk %}" class="button is-small is-link">
+                                        View Details
+                                    </a>
                                 </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="4">No clients found in this network.</td>
+                                <td colspan="5">No clients found in this network.</td>
                             </tr>
                         {% endfor %}
                     </tbody>

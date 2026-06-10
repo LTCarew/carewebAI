@@ -225,6 +225,8 @@ class CaregiverProfile(models.Model):
     base_zip_code = models.CharField(max_length=10)
     willing_to_work_cities = models.JSONField(default=list, blank=True)
 
+    attendant_care_programs = models.JSONField(default=list, blank=True)
+
     transportation = models.JSONField(default=list, blank=True)
     availability = models.JSONField(default=dict, blank=True)
 

@@ -40,12 +40,12 @@ Caregiver Application
                     <div class="app-form-section is-active" data-section="1">
                         <div class="app-form-section-header">
                             <h2 class="app-form-section-title">Basic Information</h2>
-                            <p class="app-form-section-description">Let's start with your contact details</p>
+                            <p class="app-form-section-description">Create your account and provide your contact details</p>
                         </div>
 
                         <div class="app-form-grid">
                             {% for field in form %}
-                                {% if field.name in "organization,name,phone,email,contact_preferences,pronouns,base_zip_code" %}
+                                {% if field.name in "username,password1,password2,name,phone,email,contact_preferences,pronouns,base_zip_code" %}
                                     <div class="field app-field{% if field.field.widget.input_type == 'checkbox' %} app-checkbox-field{% endif %}">
                                         <label class="label" for="{{ field.id_for_label }}">
                                             {{ field.label }}
@@ -59,6 +59,11 @@ Caregiver Application
                                     </div>
                                 {% endif %}
                             {% endfor %}
+                            
+                            <!-- Account Activation Notice -->
+                            <div class="notification is-info is-light" style="grid-column: 1 / -1;">
+                                <p><strong>Note:</strong> Your account will be created but inactive until approved by at least one organization. You'll receive an email when you're approved and can login.</p>
+                            </div>
                         </div>
                     </div>
 

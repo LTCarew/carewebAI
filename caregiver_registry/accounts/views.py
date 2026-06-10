@@ -58,7 +58,7 @@ def organization_signup(request):
 
             login(request, user)
             messages.success(request, "Organization setup complete. Welcome!")
-            return redirect("admin_dashboard")
+            return redirect("org_dashboard")
     else:
         form = OrganizationAdminSignupForm()
 

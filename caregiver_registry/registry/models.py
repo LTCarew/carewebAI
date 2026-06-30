@@ -242,6 +242,11 @@ class CaregiverProfile(models.Model):
     languages_spoken = models.JSONField(default=list, blank=True)
     pathogen_protocols = models.JSONField(default=list, blank=True)
 
+    desired_hours_per_week = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Desired number of work hours per week"
+    )
+
     rate = models.CharField(max_length=50, choices=RATE_CHOICES)
 
     bio = models.TextField(blank=True)

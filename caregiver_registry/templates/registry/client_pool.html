@@ -63,6 +63,7 @@ Client Pool - {{ organization.name }}
                 </tbody>
             </table>
         </div>
+        {% include "includes/_pagination.html" with page_obj=clients page_param="clients_page" %}
     </div>
 </div>
 

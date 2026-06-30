@@ -1,58 +1,21 @@
 {% extends "base.html" %}
 
 {% block title %}
-Client Review
+Client Details
 {% endblock %}
 
 {% block content %}
 
-<!-- Admin review header and navigation actions -->
+<!-- Header -->
 <div class="level mb-4">
     <div class="level-left">
         <div>
-            <h1 class="title is-3">Client Review</h1>
-            <p class="subtitle is-6 mb-0">Review care needs, schedule, and preferences before setting status.</p>
+            <h1 class="title is-3">Client Details</h1>
+            <p class="subtitle is-6 mb-0">View care needs, schedule, and preferences.</p>
         </div>
     </div>
     <div class="level-right">
         <a href="{% url 'org_dashboard' %}" class="button is-light">Back to Dashboard</a>
-    </div>
-</div>
-
-<!-- Status chip + status workflow controls (POST-only) -->
-<div class="box mb-5">
-    <div class="level">
-        <div class="level-left">
-            <div>
-                <p class="heading">Current Status</p>
-                {% if org_client.status == "approved" %}
-                    <span class="tag is-success is-medium">Approved</span>
-                {% elif org_client.status == "rejected" %}
-                    <span class="tag is-danger is-medium">Rejected</span>
-                {% else %}
-                    <span class="tag is-warning is-medium">Pending</span>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="level-right">
-            <div class="buttons">
-                <form method="post" action="{% url 'update_client_status' org_client.pk 'approved' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="button is-success">Approve</button>
-                </form>
-
-                <form method="post" action="{% url 'update_client_status' org_client.pk 'rejected' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="button is-danger">Reject</button>
-                </form>
-
-                <form method="post" action="{% url 'update_client_status' org_client.pk 'pending' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="button is-warning is-light">Mark Pending</button>
-                </form>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -94,8 +57,17 @@ Client Review
                 <h2 class="title is-5">Availability</h2>
                 {% if org_client.client_profile.availability %}
                     <ul>
-                        {% for day, hours in org_client.client_profile.availability.items %}
-                            <li><strong>{{ day|title }}:</strong> {{ hours.start }} – {{ hours.end }}</li>
+                        {% for day, periods in org_client.client_profile.availability.items %}
+                            <li>
+                                <strong>{{ day|title }}:</strong>
+                                {% for period in periods %}
+                                    {% if period == "morning" %}Morning (6 AM–12 PM){% endif %}
+                                    {% if period == "afternoon" %}Afternoon (12–5 PM){% endif %}
+                                    {% if period == "evening" %}Evening (5–10 PM){% endif %}
+                                    {% if period == "overnight" %}Overnight (10 PM–6 AM){% endif %}
+                                    {% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </li>
                         {% endfor %}
                     </ul>
                 {% else %}

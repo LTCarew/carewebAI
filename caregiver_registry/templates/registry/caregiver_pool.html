@@ -63,6 +63,7 @@ Caregiver Pool - {{ organization.name }}
                 </tbody>
             </table>
         </div>
+        {% include "includes/_pagination.html" with page_obj=caregivers page_param="caregivers_page" %}
     </div>
 </div>
 

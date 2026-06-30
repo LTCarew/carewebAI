@@ -24,27 +24,9 @@ from .services import get_or_create_user_from_email
 User = get_user_model()
 
 
-TIME_CHOICES = [
-    ("", "Select time"),
-    ("06:00", "6:00 AM"),
-    ("07:00", "7:00 AM"),
-    ("08:00", "8:00 AM"),
-    ("09:00", "9:00 AM"),
-    ("10:00", "10:00 AM"),
-    ("11:00", "11:00 AM"),
-    ("12:00", "12:00 PM"),
-    ("13:00", "1:00 PM"),
-    ("14:00", "2:00 PM"),
-    ("15:00", "3:00 PM"),
-    ("16:00", "4:00 PM"),
-    ("17:00", "5:00 PM"),
-    ("18:00", "6:00 PM"),
-    ("19:00", "7:00 PM"),
-    ("20:00", "8:00 PM"),
-    ("21:00", "9:00 PM"),
-    ("22:00", "10:00 PM"),
-]
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Availability constants
+# ─────────────────────────────────────────────────────────────────────────────
 
 DAYS = [
     "monday",
@@ -54,6 +36,13 @@ DAYS = [
     "friday",
     "saturday",
     "sunday",
+]
+
+TIME_PERIOD_CHOICES = [
+    ("morning",   "Morning       6:00 AM – 12:00 PM"),
+    ("afternoon", "Afternoon   12:00 PM – 5:00 PM"),
+    ("evening",   "Evening       5:00 PM – 10:00 PM"),
+    ("overnight", "Overnight   10:00 PM – 6:00 AM"),
 ]
 
 
@@ -77,45 +66,47 @@ def apply_bulma_classes(form):
 
 
 class AvailabilityMixin:
+    """
+    Adds per-day multiple-choice time-period checkboxes to a form.
+
+    For each day (Monday–Sunday) this adds a `{day}_periods` field with
+    choices: Morning, Afternoon, Evening, Overnight.
+
+    JSON format stored on the profile:
+        {
+          "monday": ["morning", "afternoon"],
+          "tuesday": ["overnight"]
+        }
+    Only days with at least one period selected are stored.
+    """
+
     def add_availability_fields(self):
         for day in DAYS:
-            self.fields[f"{day}_available"] = forms.BooleanField(
+            self.fields[f"{day}_periods"] = forms.MultipleChoiceField(
+                choices=TIME_PERIOD_CHOICES,
+                widget=forms.CheckboxSelectMultiple,
                 required=False,
-                label=day.title()
-            )
-            self.fields[f"{day}_start"] = forms.ChoiceField(
-                choices=TIME_CHOICES,
-                required=False,
-                label=f"{day.title()} Start"
-            )
-            self.fields[f"{day}_end"] = forms.ChoiceField(
-                choices=TIME_CHOICES,
-                required=False,
-                label=f"{day.title()} End"
+                label=day.title(),
             )
 
     def build_availability_json(self):
         availability = {}
-
         for day in DAYS:
-            is_available = self.cleaned_data.get(f"{day}_available")
-            start = self.cleaned_data.get(f"{day}_start")
-            end = self.cleaned_data.get(f"{day}_end")
-
-            if is_available and start and end:
-                availability[day] = {
-                    "start": start,
-                    "end": end
-                }
-
+            periods = self.cleaned_data.get(f"{day}_periods") or []
+            if periods:
+                availability[day] = list(periods)
         return availability
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Caregiver Application Form
+# ─────────────────────────────────────────────────────────────────────────────
 
 class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
     """
     Form for caregiver applications.
     Creates User, UserProfile, and CaregiverProfile.
-    Applicants go into a general pool - organizations add them later.
+    Applicants go into a general pool — organizations add them later.
     """
     # Account credentials
     name = forms.CharField(max_length=255)
@@ -133,9 +124,8 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
         widget=forms.PasswordInput,
         help_text="Enter the same password again"
     )
-    
+
     # Personal information
-    
     phone = forms.CharField(max_length=25)
     email = forms.EmailField()
     contact_preferences = forms.MultipleChoiceField(
@@ -143,53 +133,61 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
         widget=forms.CheckboxSelectMultiple
     )
     pronouns = forms.ChoiceField(choices=PRONOUN_CHOICES, required=False)
-    
+
     base_zip_code = forms.CharField(max_length=10)
     willing_to_work_cities = forms.MultipleChoiceField(
         choices=[],
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     transportation = forms.MultipleChoiceField(
         choices=TRANSPORTATION_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     hours_looking_for = forms.ChoiceField(choices=HOURS_LOOKING_FOR_CHOICES)
-    
+
+    desired_hours_per_week = forms.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=168,
+        label="Desired work hours per week",
+        help_text="How many hours per week are you looking to work?"
+    )
+
     certified_ihss_worker = forms.BooleanField(required=False)
     additional_certifications = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False
     )
-    
+
     experience_with = forms.MultipleChoiceField(
         choices=EXPERIENCE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     languages_spoken = forms.MultipleChoiceField(
         choices=LANGUAGE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     pathogen_protocols = forms.MultipleChoiceField(
         choices=PATHOGEN_PROTOCOL_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     rate = forms.ChoiceField(choices=RATE_CHOICES)
     bio = forms.CharField(widget=forms.Textarea(attrs={"rows": 4}), required=False)
     wants_training_updates = forms.BooleanField(required=False)
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         cities = (
             Organization.objects
             .exclude(city="")
@@ -198,50 +196,41 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
             .order_by("city")
         )
         self.fields["willing_to_work_cities"].choices = list(cities)
-        
+
         self.add_availability_fields()
         apply_bulma_classes(self)
-    
+
     def clean_username(self):
-        """Validate that username is unique."""
         username = self.cleaned_data.get('username')
         if User.objects.filter(username=username).exists():
             raise forms.ValidationError("This username is already taken. Please choose another.")
         return username
-    
+
     def clean_email(self):
-        """Validate that email is unique."""
         email = self.cleaned_data.get('email')
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("An account with this email already exists.")
         return email
-    
+
     def clean(self):
-        """Validate that passwords match."""
         cleaned_data = super().clean()
         password1 = cleaned_data.get('password1')
         password2 = cleaned_data.get('password2')
-        
+
         if password1 and password2 and password1 != password2:
             raise forms.ValidationError("The two password fields must match.")
-        
+
         return cleaned_data
-    
+
     @transaction.atomic
     def save(self):
-        """
-        Create User (inactive), UserProfile, and CaregiverProfile.
-        User cannot login until approved by at least one organization.
-        """
-        # 1. Create User with is_active=False
         user = User.objects.create_user(
             username=self.cleaned_data['username'],
             email=self.cleaned_data['email'],
             password=self.cleaned_data['password1'],
-            is_active=False  # Cannot login until approved
+            is_active=False
         )
-        
-        # 2. Create UserProfile
+
         user_profile = UserProfile.objects.create(
             user=user,
             name=self.cleaned_data['name'],
@@ -250,8 +239,7 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
             pronouns=self.cleaned_data.get('pronouns', ''),
             contact_preferences=self.cleaned_data['contact_preferences'],
         )
-        
-        # 3. Create CaregiverProfile
+
         caregiver_profile = CaregiverProfile.objects.create(
             user_profile=user_profile,
             base_zip_code=self.cleaned_data['base_zip_code'],
@@ -259,6 +247,7 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
             transportation=self.cleaned_data['transportation'],
             availability=self.build_availability_json(),
             hours_looking_for=self.cleaned_data['hours_looking_for'],
+            desired_hours_per_week=self.cleaned_data.get('desired_hours_per_week'),
             certified_ihss_worker=self.cleaned_data['certified_ihss_worker'],
             additional_certifications=self.cleaned_data.get('additional_certifications', ''),
             experience_with=self.cleaned_data['experience_with'],
@@ -268,15 +257,19 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
             bio=self.cleaned_data.get('bio', ''),
             wants_training_updates=self.cleaned_data.get('wants_training_updates', False),
         )
-        
+
         return caregiver_profile
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Client Application Form
+# ─────────────────────────────────────────────────────────────────────────────
 
 class ClientApplicationForm(AvailabilityMixin, forms.Form):
     """
     Form for client applications.
     Creates User, UserProfile, and ClientProfile.
-    Applicants go into a general pool - organizations add them later.
+    Applicants go into a general pool — organizations add them later.
     """
     # Account credentials
     name = forms.CharField(max_length=255)
@@ -294,9 +287,8 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
         widget=forms.PasswordInput,
         help_text="Enter the same password again"
     )
-    
+
     # Personal information
-    
     phone = forms.CharField(max_length=25)
     email = forms.EmailField()
     contact_preferences = forms.MultipleChoiceField(
@@ -304,87 +296,84 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
         widget=forms.CheckboxSelectMultiple
     )
     pronouns = forms.ChoiceField(choices=PRONOUN_CHOICES, required=False)
-    
+
     address = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}))
     base_zip_code = forms.CharField(max_length=10)
-    
+
     attendant_care_programs = forms.MultipleChoiceField(
         choices=ATTENDANT_PROGRAM_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     languages_preferred = forms.MultipleChoiceField(
         choices=LANGUAGE_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     schedule_flexibility = forms.BooleanField(required=False)
-    hours_per_week = forms.IntegerField(required=False, min_value=0)
-    
+    hours_per_week = forms.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=168,
+        label="Desired care hours per week",
+        help_text="How many hours per week do you need care services?"
+    )
+
     care_needs = forms.MultipleChoiceField(
         choices=CARE_NEEDS_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     additional_care_needs = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False
     )
-    
+
     pathogen_protocol_preferences = forms.MultipleChoiceField(
         choices=PATHOGEN_PROTOCOL_CHOICES,
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.add_availability_fields()
         apply_bulma_classes(self)
-    
+
     def clean_username(self):
-        """Validate that username is unique."""
         username = self.cleaned_data.get('username')
         if User.objects.filter(username=username).exists():
             raise forms.ValidationError("This username is already taken. Please choose another.")
         return username
-    
+
     def clean_email(self):
-        """Validate that email is unique."""
         email = self.cleaned_data.get('email')
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("An account with this email already exists.")
         return email
-    
+
     def clean(self):
-        """Validate that passwords match."""
         cleaned_data = super().clean()
         password1 = cleaned_data.get('password1')
         password2 = cleaned_data.get('password2')
-        
+
         if password1 and password2 and password1 != password2:
             raise forms.ValidationError("The two password fields must match.")
-        
+
         return cleaned_data
-    
+
     @transaction.atomic
     def save(self):
-        """
-        Create User (inactive), UserProfile, and ClientProfile.
-        User cannot login until approved by at least one organization.
-        """
-        # 1. Create User with is_active=False
         user = User.objects.create_user(
             username=self.cleaned_data['username'],
             email=self.cleaned_data['email'],
             password=self.cleaned_data['password1'],
-            is_active=False  # Cannot login until approved
+            is_active=False
         )
-        
-        # 2. Create UserProfile
+
         user_profile = UserProfile.objects.create(
             user=user,
             name=self.cleaned_data['name'],
@@ -394,8 +383,7 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
             contact_preferences=self.cleaned_data['contact_preferences'],
             address=self.cleaned_data['address'],
         )
-        
-        # 3. Create ClientProfile
+
         client_profile = ClientProfile.objects.create(
             user_profile=user_profile,
             base_zip_code=self.cleaned_data['base_zip_code'],
@@ -408,7 +396,7 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
             additional_care_needs=self.cleaned_data.get('additional_care_needs', ''),
             pathogen_protocol_preferences=self.cleaned_data['pathogen_protocol_preferences'],
         )
-        
+
         return client_profile
 
 
@@ -425,7 +413,7 @@ class CoordinatorInviteForm(forms.Form):
         label="Coordinator Email",
         help_text="Email address of the person you want to invite as your support coordinator"
     )
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_bulma_classes(self)
@@ -436,75 +424,60 @@ class CoordinatorSignupForm(forms.Form):
     Form for invited coordinators to sign up and accept the invitation.
     Creates User, UserProfile, SupportCoordinatorProfile, and ClientCoordinator records.
     """
-    # Pre-filled from invite (read-only)
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(attrs={'readonly': 'readonly'})
     )
-    
-    # Coordinator information
+
     name = forms.CharField(max_length=255, label="Full Name")
     phone = forms.CharField(max_length=25, label="Phone Number")
-    
+
     contact_preferences = forms.MultipleChoiceField(
         choices=CONTACT_PREFERENCES,
         widget=forms.CheckboxSelectMultiple,
         label="Preferred Contact Methods"
     )
-    
+
     pronouns = forms.ChoiceField(
         choices=PRONOUN_CHOICES,
         required=False,
         label="Pronouns"
     )
-    
-    # Coordinator-specific fields
+
     relationship_to_clients = forms.CharField(
         max_length=100,
         label="Relationship to Client",
         help_text="E.g., Family member, Friend, Agency representative, etc."
     )
-    
+
     credentials = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False,
         label="Professional Credentials",
         help_text="List any relevant professional credentials or qualifications"
     )
-    
+
     certifications = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False,
         label="Certifications",
         help_text="List any relevant certifications"
     )
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_bulma_classes(self)
-    
+
     @transaction.atomic
     def save(self, invite):
-        """
-        Create User, UserProfile, SupportCoordinatorProfile, and ClientCoordinator.
-        Mark the invitation as used.
-        
-        Args:
-            invite: CoordinatorInvite instance
-        
-        Returns:
-            ClientCoordinator instance
-        """
         from .models import SupportCoordinatorProfile, ClientCoordinator
         from django.utils import timezone
-        
-        # 1. Get or create User
+
         user = get_or_create_user_from_email(
             email=self.cleaned_data['email'],
             name=self.cleaned_data['name']
         )
-        
-        # 2. Create or update UserProfile
+
         user_profile, _ = UserProfile.objects.update_or_create(
             user=user,
             defaults={
@@ -515,8 +488,7 @@ class CoordinatorSignupForm(forms.Form):
                 'contact_preferences': self.cleaned_data['contact_preferences'],
             }
         )
-        
-        # 3. Create or update SupportCoordinatorProfile
+
         coordinator_profile, _ = SupportCoordinatorProfile.objects.update_or_create(
             user_profile=user_profile,
             defaults={
@@ -525,20 +497,18 @@ class CoordinatorSignupForm(forms.Form):
                 'certifications': self.cleaned_data.get('certifications', ''),
             }
         )
-        
-        # 4. Create ClientCoordinator relationship
+
         client_coordinator, _ = ClientCoordinator.objects.update_or_create(
             client_profile=invite.client_profile,
             coordinator_profile=coordinator_profile,
             defaults={
-                'status': 'active',  # Auto-active since they accepted invite
+                'status': 'active',
                 'invited_by': invite.invited_by,
                 'accepted_at': timezone.now(),
             }
         )
-        
-        # 5. Mark invitation as used
+
         invite.used_at = timezone.now()
         invite.save()
-        
+
         return client_coordinator

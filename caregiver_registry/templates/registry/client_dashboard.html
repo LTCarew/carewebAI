@@ -1,21 +1,91 @@
 {% extends "base.html" %}
-
+{% block title %}Client Dashboard{% endblock %}
 {% block content %}
-<div class="columns is-centered">
-    <div class="column is-8-tablet is-7-desktop">
-        <div class="card app-card app-dashboard-card">
-            <div class="card-content">
-                <h1 class="title is-2">Client Dashboard</h1>
-
-                <p class="subtitle is-5">
-                    You have client access.
-                </p>
-
-                <a class="button is-link is-large" href="{% url 'registry_network' %}">
-                    View Caregiver Registry
-                </a>
-            </div>
-        </div>
-    </div>
+<div class="mb-5">
+  <h1 class="title is-2">Client Dashboard</h1>
+  {% if client_profile %}
+    <p class="subtitle is-5">Welcome, {{ client_profile.user_profile.name }}.</p>
+  {% endif %}
+  <div class="buttons">
+    <a href="{% url 'registry_network' %}" class="button is-link">View Caregiver Registry</a>
+    <a href="{% url 'ai_match_client' %}" class="button is-info">✨ AI Assisted Match</a>
+    <a href="{% url 'coordinator_invite_send' %}" class="button is-light">Invite Support Coordinator</a>
+  </div>
 </div>
+
+{% if unread_notifications %}
+<div class="box mb-4" aria-label="Notifications">
+  <h2 class="title is-6 mb-2">🔔 Notifications</h2>
+  {% for notif in unread_notifications %}
+    <p class="is-size-7 mb-1"><strong>{{ notif.subject }}</strong> — {{ notif.message|truncatewords:15 }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">⏳ Pending My Approval</h2>
+    {% with matches=pending_my_approval viewer_role="client" show_actions=True page_param="p_mine" empty_message="No matches waiting for your approval." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">🧑‍⚕️ Pending Caregiver Approval</h2>
+    {% with matches=pending_caregiver viewer_role="client" show_actions=False page_param="p_cg" empty_message="No matches waiting for caregiver approval." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">✅ Active Matches</h2>
+    {% with matches=active_matches viewer_role="client" show_actions=False page_param="p_active" empty_message="No active matches yet." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">❌ Declined / Cancelled</h2>
+    {% with matches=declined_matches viewer_role="client" show_actions=False page_param="p_declined" empty_message="No declined matches." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+{% if coordinators %}
+<div class="card app-card mt-5">
+  <div class="card-content">
+    <h2 class="title is-5">Support Coordinators</h2>
+    <table class="table is-fullwidth is-striped">
+      <thead><tr><th>Name</th><th>Status</th><th>Can Edit Profile</th><th>Can Approve Caregivers</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for rel in coordinators %}
+        <tr>
+          <td>{{ rel.coordinator_profile.user_profile.name }}</td>
+          <td><span class="tag is-info is-light">{{ rel.status }}</span></td>
+          <td>{{ rel.can_edit_profile|yesno:"Yes,No" }}</td>
+          <td>{{ rel.can_approve_caregivers|yesno:"Yes,No" }}</td>
+          <td>
+            <form method="post" action="{% url 'coordinator_permissions_update' rel.pk %}">
+              {% csrf_token %}
+              <label><input type="checkbox" name="can_edit_profile" {% if rel.can_edit_profile %}checked{% endif %}> Edit</label>
+              <label class="ml-2"><input type="checkbox" name="can_approve_caregivers" {% if rel.can_approve_caregivers %}checked{% endif %}> Approve</label>
+              <button type="submit" class="button is-small is-link ml-2">Save</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% include "includes/_pagination.html" with page_obj=coordinators page_param="coordinators_page" %}
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

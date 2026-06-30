@@ -1,0 +1,118 @@
+{% comment %}
+Reusable match table partial.
+
+Required context:
+  matches        — Page object (from Paginator.get_page)
+  viewer_role    — 'caregiver', 'client', or 'staff'
+  show_actions   — True/False whether to render approve/decline/cancel buttons
+  page_param     — GET parameter name for pagination
+  empty_message  — String shown when no rows
+
+Optional context:
+  action_approve_label — defaults to "Approve"
+  action_decline_label — defaults to "Decline"
+{% endcomment %}
+
+{% if matches.object_list %}
+<div class="table-container" role="region" aria-label="{{ section_title|default:'Matches' }}">
+  <table class="table is-fullwidth is-striped is-hoverable" aria-label="{{ section_title|default:'Matches' }}">
+    <thead>
+      <tr>
+        <th scope="col">Caregiver</th>
+        <th scope="col">Client</th>
+        <th scope="col">Score</th>
+        <th scope="col">Tags</th>
+        <th scope="col">Client Status</th>
+        <th scope="col">Caregiver Status</th>
+        {% if show_actions %}<th scope="col">Actions</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for match in matches %}
+      <tr>
+        <td>
+          <a href="{% url 'caregiver_detail' match.caregiver.id %}">
+            {{ match.caregiver.user_profile.name }}
+          </a>
+        </td>
+        <td>
+          <a href="{% url 'client_detail' match.client.id %}">
+            {{ match.client.user_profile.name }}
+          </a>
+        </td>
+        <td>
+          {% if match.match_score is not None %}
+            <span class="tag {% if match.match_score >= 70 %}is-success{% elif match.match_score >= 40 %}is-warning{% else %}is-light{% endif %}">
+              {{ match.match_score }}
+            </span>
+          {% else %}
+            <span class="tag is-light">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% for tag in match.selected_tags.all %}
+            <span class="tag is-info is-light is-small">#{{ tag.name }}</span>
+          {% empty %}
+            <span class="has-text-grey-light is-size-7">None</span>
+          {% endfor %}
+        </td>
+        <td>
+          {% if match.client_status == "approved" %}
+            <span class="tag is-success is-light">Approved</span>
+          {% elif match.client_status == "declined" %}
+            <span class="tag is-danger is-light">Declined</span>
+          {% else %}
+            <span class="tag is-warning is-light">Pending</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if match.caregiver_status == "approved" %}
+            <span class="tag is-success is-light">Approved</span>
+          {% elif match.caregiver_status == "declined" %}
+            <span class="tag is-danger is-light">Declined</span>
+          {% else %}
+            <span class="tag is-warning is-light">Pending</span>
+          {% endif %}
+        </td>
+        {% if show_actions %}
+        <td>
+          <div class="buttons are-small">
+            {% if viewer_role == "caregiver" and match.caregiver_status == "pending" %}
+              <form method="post" action="{% url 'match_respond' match.pk 'approve' %}">
+                {% csrf_token %}
+                <button type="submit" class="button is-success is-small">Approve</button>
+              </form>
+              <form method="post" action="{% url 'match_respond' match.pk 'decline' %}">
+                {% csrf_token %}
+                <button type="submit" class="button is-danger is-small">Decline</button>
+              </form>
+            {% elif viewer_role == "client" and match.client_status == "pending" %}
+              <form method="post" action="{% url 'match_respond' match.pk 'approve' %}">
+                {% csrf_token %}
+                <button type="submit" class="button is-success is-small">Approve</button>
+              </form>
+              <form method="post" action="{% url 'match_respond' match.pk 'decline' %}">
+                {% csrf_token %}
+                <button type="submit" class="button is-danger is-small">Decline</button>
+              </form>
+            {% endif %}
+            {% if match.status == "pending" %}
+              <form method="post" action="{% url 'match_cancel' match.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="button is-light is-small">Cancel</button>
+              </form>
+            {% endif %}
+          </div>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "includes/_pagination.html" with page_obj=matches page_param=page_param %}
+
+{% else %}
+<p class="has-text-grey-light is-italic">{{ empty_message|default:"No matches in this group." }}</p>
+{% endif %}

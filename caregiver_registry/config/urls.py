@@ -4,8 +4,9 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("",include("registry.urls")),
-    path("",include("django.contrib.auth.urls")),
+    path("", include("registry.urls")),
+    path("", include("matching.urls")),
+    path("", include("django.contrib.auth.urls")),
     path(
         "logout/",
         LogoutView.as_view(),

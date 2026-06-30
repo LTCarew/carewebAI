@@ -134,3 +134,14 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'CareWeb AI <noreply@carewe
 
 # Site URL for invitation links
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
+
+# =============================================================================
+# OpenAI / ChatGPT settings
+# =============================================================================
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Model used for AI-assisted matching. gpt-4o-mini gives a good speed/cost balance.
+OPENAI_MATCH_MODEL = os.getenv("OPENAI_MATCH_MODEL", "gpt-4o-mini")
+# Timeout in seconds for ChatGPT API calls during matching.
+OPENAI_MATCH_TIMEOUT = int(os.getenv("OPENAI_MATCH_TIMEOUT", "15"))
+# Set to "false" to disable ChatGPT scoring even when the API key is present.
+OPENAI_MATCH_ENABLED = os.getenv("OPENAI_MATCH_ENABLED", "true").lower() == "true"

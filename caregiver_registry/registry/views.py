@@ -2,6 +2,7 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CaregiverApplicationForm, ClientApplicationForm
@@ -291,103 +292,293 @@ def dashboard_redirect(request):
 
 @login_required
 def caregiver_dashboard(request):
-    return render(request, "registry/caregiver_dashboard.html")
+    """
+    Caregiver dashboard showing pending and active matches grouped by state.
+    Matches paginated at 10 per group.
+    """
+    from matching.models import Match
+
+    try:
+        caregiver_profile = request.user.profile.caregiver_profile
+    except Exception:
+        messages.error(request, "Could not load your caregiver profile.")
+        return redirect("home")
+
+    base_qs = Match.objects.filter(caregiver=caregiver_profile).select_related(
+        "client__user_profile",
+        "caregiver__user_profile",
+        "organization",
+    ).prefetch_related("selected_tags")
+
+    def paginate(qs, param, n=10):
+        p = Paginator(qs, n)
+        return p.get_page(request.GET.get(param, 1))
+
+    pending_my_approval   = paginate(base_qs.filter(status="pending", caregiver_status="pending"), "p_mine")
+    pending_client        = paginate(base_qs.filter(status="pending", caregiver_status="approved", client_status="pending"), "p_client")
+    active_matches        = paginate(base_qs.filter(status="active"), "p_active")
+    declined_matches      = paginate(base_qs.filter(status__in=["declined", "cancelled"]).order_by("-updated_at"), "p_declined")
+
+    # Unread notifications
+    unread_notifications = request.user.profile.notifications.filter(is_read=False).order_by("-created_at")[:5]
+
+    return render(request, "registry/caregiver_dashboard.html", {
+        "caregiver_profile": caregiver_profile,
+        "pending_my_approval": pending_my_approval,
+        "pending_client": pending_client,
+        "active_matches": active_matches,
+        "declined_matches": declined_matches,
+        "unread_notifications": unread_notifications,
+    })
 
 
 @login_required
 def client_dashboard(request):
-    return render(request, "registry/client_dashboard.html")
+    """
+    Client dashboard showing pending and active matches grouped by state.
+    Matches paginated at 10 per group.
+    """
+    from matching.models import Match
+
+    try:
+        client_profile = request.user.profile.client_profile
+    except Exception:
+        messages.error(request, "Could not load your client profile.")
+        return redirect("home")
+
+    base_qs = Match.objects.filter(client=client_profile).select_related(
+        "client__user_profile",
+        "caregiver__user_profile",
+        "organization",
+    ).prefetch_related("selected_tags")
+
+    def paginate(qs, param, n=10):
+        p = Paginator(qs, n)
+        return p.get_page(request.GET.get(param, 1))
+
+    pending_my_approval   = paginate(base_qs.filter(status="pending", client_status="pending"), "p_mine")
+    pending_caregiver     = paginate(base_qs.filter(status="pending", client_status="approved", caregiver_status="pending"), "p_cg")
+    active_matches        = paginate(base_qs.filter(status="active"), "p_active")
+    declined_matches      = paginate(base_qs.filter(status__in=["declined", "cancelled"]).order_by("-updated_at"), "p_declined")
+
+    # Unread notifications
+    unread_notifications = request.user.profile.notifications.filter(is_read=False).order_by("-created_at")[:5]
+
+    # Coordinator support
+    from .services import get_client_coordinators
+    coordinators_qs = get_client_coordinators(client_profile)
+    coordinators = Paginator(coordinators_qs, 10).get_page(request.GET.get("coordinators_page", 1))
+
+    return render(request, "registry/client_dashboard.html", {
+        "client_profile": client_profile,
+        "pending_my_approval": pending_my_approval,
+        "pending_caregiver": pending_caregiver,
+        "active_matches": active_matches,
+        "declined_matches": declined_matches,
+        "unread_notifications": unread_notifications,
+        "coordinators": coordinators,
+    })
 
 
 @login_required
 def registry_network(request):
-    """Unified registry page with role-based visibility."""
+    """
+    Unified registry matching page with role-based visibility.
+
+    - Caregiver: selects tags, sees scored client matches from their network.
+    - Client:    selects tags, sees scored caregiver matches from their network.
+    - Staff:     selects match direction (caregiver→clients or client→caregivers),
+                 picks one person, selects tags, sees scored results.
+
+    Nothing is displayed until criteria are submitted.
+    """
+    from matching.models import Tag
+    from matching.services import (
+        find_best_clients_for_caregiver,
+        find_best_caregivers_for_client,
+    )
+    from registry.models import CaregiverProfile, ClientProfile
+
     # Get active organization
     organization = get_active_organization(request)
-    
+
     if not organization:
         messages.warning(request, "Your account is not linked to an organization yet.")
         return redirect("dashboard_redirect")
 
-    # Get user's role in the organization
     user_role = get_user_primary_role(request.user, organization)
-    
+
     if not user_role:
         messages.warning(request, "You do not have an active role in this organization.")
         return redirect("dashboard_redirect")
 
-    # Query caregivers and clients based on role and shared organizations
-    if user_role == "client":
-        # Client sees caregivers from ALL their approved organizations
-        try:
-            client_profile = request.user.profile.client_profile
-            # Get all orgs this client is approved in
-            client_org_ids = OrganizationClient.objects.filter(
-                client_profile=client_profile,
-                status='approved'
-            ).values_list('organization_id', flat=True)
-            
-            # Show caregivers approved in those same orgs
-            org_caregivers = OrganizationCaregiver.objects.filter(
-                organization_id__in=client_org_ids,
-                status='approved'
-            ).select_related('caregiver_profile__user_profile', 'organization').order_by('-created_at').distinct()
-            
-            org_clients = OrganizationClient.objects.none()
-            selected_view = "caregivers"
-            
-        except (AttributeError, Exception):
-            messages.error(request, "Could not load caregiver registry.")
-            return redirect("dashboard_redirect")
-            
-    elif user_role == "caregiver":
-        # Caregiver sees clients from ALL their approved organizations
+    all_tags = Tag.objects.filter(is_active=True)
+    tag_ids = request.GET.getlist("tag_ids")
+    match_results = None       # Only populated after the user submits criteria
+    match_direction = None     # "find_clients" or "find_caregivers"
+
+    # ── Caregiver: they are the caregiver; select tags to find matching clients ──
+    if user_role == "caregiver":
         try:
             caregiver_profile = request.user.profile.caregiver_profile
-            # Get all orgs this caregiver is approved in
-            caregiver_org_ids = OrganizationCaregiver.objects.filter(
-                caregiver_profile=caregiver_profile,
-                status='approved'
-            ).values_list('organization_id', flat=True)
-            
-            # Show clients approved in those same orgs
-            org_clients = OrganizationClient.objects.filter(
-                organization_id__in=caregiver_org_ids,
-                status='approved'
-            ).select_related('client_profile__user_profile', 'organization').order_by('-created_at').distinct()
-            
-            org_caregivers = OrganizationCaregiver.objects.none()
-            selected_view = "clients"
-            
-        except (AttributeError, Exception):
-            messages.error(request, "Could not load client registry.")
+        except Exception:
+            messages.error(request, "Could not load your caregiver profile.")
             return redirect("dashboard_redirect")
-            
+
+        # Get all orgs this caregiver is approved in (their network scope)
+        caregiver_org_ids = OrganizationCaregiver.objects.filter(
+            caregiver_profile=caregiver_profile,
+            status="approved",
+        ).values_list("organization_id", flat=True)
+
+        # Build a queryset of org_clients for the active organization scope
+        org_clients_qs = OrganizationClient.objects.filter(
+            organization_id__in=caregiver_org_ids,
+            status="approved",
+        ).select_related("client_profile__user_profile", "organization").distinct()
+
+        match_direction = "find_clients"
+
+        if tag_ids:
+            # Score all eligible clients against this caregiver in their orgs
+            from matching.services import find_best_clients_for_caregiver as _find
+            raw_results = []
+            seen_client_ids = set()
+            for org_id in caregiver_org_ids:
+                from organizations.models import Organization
+                try:
+                    org_obj = Organization.objects.get(pk=org_id)
+                except Organization.DoesNotExist:
+                    continue
+                for r in _find(caregiver_profile, org_obj, limit=200, tag_ids=tag_ids):
+                    if r["client"].pk not in seen_client_ids:
+                        seen_client_ids.add(r["client"].pk)
+                        raw_results.append(r)
+            raw_results.sort(key=lambda x: x["score"], reverse=True)
+            all_results = raw_results
+            match_results = Paginator(all_results, 10).get_page(request.GET.get("page", 1))
+
+        return render(request, "registry/network_registry.html", {
+            "user_role": user_role,
+            "is_admin_staff": False,
+            "organization_name": organization.name,
+            "all_tags": all_tags,
+            "selected_tag_ids": [int(t) for t in tag_ids],
+            "match_direction": match_direction,
+            "match_results": match_results,
+            "caregiver_profile": caregiver_profile,
+        })
+
+    # ── Client: they are the client; select tags to find matching caregivers ──
+    elif user_role == "client":
+        try:
+            client_profile = request.user.profile.client_profile
+        except Exception:
+            messages.error(request, "Could not load your client profile.")
+            return redirect("dashboard_redirect")
+
+        client_org_ids = OrganizationClient.objects.filter(
+            client_profile=client_profile,
+            status="approved",
+        ).values_list("organization_id", flat=True)
+
+        match_direction = "find_caregivers"
+
+        if tag_ids:
+            from matching.services import find_best_caregivers_for_client as _find
+            raw_results = []
+            seen_cg_ids = set()
+            for org_id in client_org_ids:
+                from organizations.models import Organization
+                try:
+                    org_obj = Organization.objects.get(pk=org_id)
+                except Organization.DoesNotExist:
+                    continue
+                for r in _find(client_profile, org_obj, limit=200, tag_ids=tag_ids):
+                    if r["caregiver"].pk not in seen_cg_ids:
+                        seen_cg_ids.add(r["caregiver"].pk)
+                        raw_results.append(r)
+            raw_results.sort(key=lambda x: x["score"], reverse=True)
+            match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
+
+        return render(request, "registry/network_registry.html", {
+            "user_role": user_role,
+            "is_admin_staff": False,
+            "organization_name": organization.name,
+            "all_tags": all_tags,
+            "selected_tag_ids": [int(t) for t in tag_ids],
+            "match_direction": match_direction,
+            "match_results": match_results,
+            "client_profile": client_profile,
+        })
+
+    # ── Staff/Admin: toggle direction, pick one person, then see scored results ──
     elif user_role in ["admin", "staff"]:
-        # Admin/staff see everyone in their active organization only
-        org_caregivers = OrganizationCaregiver.objects.filter(
+        # Direction toggle: 'find_clients' = staff picks a caregiver then sees matching clients
+        #                   'find_caregivers' = staff picks a client then sees matching caregivers
+        match_direction = request.GET.get("match_type", "find_clients")
+        if match_direction not in ("find_clients", "find_caregivers"):
+            match_direction = "find_clients"
+
+        # Load org members for the dropdowns
+        org_caregivers_qs = OrganizationCaregiver.objects.filter(
             organization=organization,
-            status='approved'
-        ).select_related('caregiver_profile__user_profile').order_by('-created_at')
-        
-        org_clients = OrganizationClient.objects.filter(
+            status="approved",
+        ).select_related("caregiver_profile__user_profile").order_by("caregiver_profile__user_profile__name")
+
+        org_clients_qs = OrganizationClient.objects.filter(
             organization=organization,
-            status='approved'
-        ).select_related('client_profile__user_profile').order_by('-created_at')
-        
-        requested_view = request.GET.get("view", "clients")
-        selected_view = requested_view if requested_view in ["clients", "caregivers"] else "clients"
+            status="approved",
+        ).select_related("client_profile__user_profile").order_by("client_profile__user_profile__name")
+
+        selected_caregiver = None
+        selected_client = None
+
+        if match_direction == "find_clients":
+            caregiver_id = request.GET.get("caregiver_id")
+            if caregiver_id:
+                try:
+                    selected_caregiver = CaregiverProfile.objects.get(pk=caregiver_id)
+                except CaregiverProfile.DoesNotExist:
+                    pass
+
+            if selected_caregiver and tag_ids:
+                raw_results = find_best_clients_for_caregiver(
+                    selected_caregiver, organization, limit=200, tag_ids=tag_ids
+                )
+                match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
+
+        else:  # find_caregivers
+            client_id = request.GET.get("client_id")
+            if client_id:
+                try:
+                    selected_client = ClientProfile.objects.get(pk=client_id)
+                except ClientProfile.DoesNotExist:
+                    pass
+
+            if selected_client and tag_ids:
+                raw_results = find_best_caregivers_for_client(
+                    selected_client, organization, limit=200, tag_ids=tag_ids
+                )
+                match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
+
+        return render(request, "registry/network_registry.html", {
+            "user_role": user_role,
+            "is_admin_staff": True,
+            "organization_name": organization.name,
+            "all_tags": all_tags,
+            "selected_tag_ids": [int(t) for t in tag_ids],
+            "match_direction": match_direction,
+            "match_results": match_results,
+            "org_caregivers": org_caregivers_qs,
+            "org_clients": org_clients_qs,
+            "selected_caregiver": selected_caregiver,
+            "selected_client": selected_client,
+        })
+
     else:
         messages.error(request, "Unsupported account role for registry access.")
         return redirect("dashboard_redirect")
-
-    return render(request, "registry/network_registry.html", {
-        "selected_view": selected_view,
-        "is_admin_staff": user_role in ["admin", "staff"],
-        "organization_name": organization.name,
-        "org_caregivers": org_caregivers,
-        "org_clients": org_clients,
-    })
 
 
 @login_required
@@ -437,6 +628,7 @@ def org_dashboard(request):
             'profile_id': caregiver.id,
             'name': caregiver.user_profile.name,
             'email': caregiver.user_profile.email,
+            'phone': caregiver.user_profile.phone or '',
             'status': rel.status if rel else 'pending',
             'relationship': rel
         })
@@ -449,6 +641,7 @@ def org_dashboard(request):
             'profile_id': client.id,
             'name': client.user_profile.name,
             'email': client.user_profile.email,
+            'phone': client.user_profile.phone or '',
             'status': rel.status if rel else 'pending',
             'relationship': rel
         })
@@ -461,9 +654,37 @@ def org_dashboard(request):
     
     full_name = request.user.get_full_name().strip() or request.user.username
 
+    # ── Match context for Stage 4 / 6 ─────────────────────────────────────
+    from matching.models import Match
+
+    def paginate(qs, param, n=10):
+        p = Paginator(qs, n)
+        return p.get_page(request.GET.get(param, 1))
+
+    if active_org:
+        match_base = Match.objects.filter(organization=active_org).select_related(
+            "caregiver__user_profile", "client__user_profile", "organization"
+        ).prefetch_related("selected_tags")
+
+        match_inquiries        = paginate(match_base.filter(status="pending"), "p_inq")
+        pending_caregiver_matches = paginate(match_base.filter(status="pending", caregiver_status="pending"), "p_cg")
+        pending_client_matches    = paginate(match_base.filter(status="pending", client_status="pending"), "p_cl")
+        active_matches            = paginate(match_base.filter(status="active"), "p_act")
+        declined_matches          = paginate(match_base.filter(status__in=["declined", "cancelled"]), "p_dec")
+    else:
+        match_inquiries = pending_caregiver_matches = pending_client_matches = active_matches = declined_matches = None
+
+    selected_view = request.GET.get("view", "caregivers")
+    if selected_view not in ("caregivers", "clients"):
+        selected_view = "caregivers"
+
+    # Paginate the caregiver and client application lists
+    caregivers_page = Paginator(caregiver_data, 10).get_page(request.GET.get("caregivers_page", 1))
+    clients_page = Paginator(client_data, 10).get_page(request.GET.get("clients_page", 1))
+
     return render(request, "registry/org_dashboard.html", {
-        "caregivers": caregiver_data,
-        "clients": client_data,
+        "caregivers": caregivers_page,
+        "clients": clients_page,
         "pending_caregivers": pending_caregivers,
         "pending_clients": pending_clients,
         "approved_caregivers": approved_caregivers,
@@ -471,6 +692,13 @@ def org_dashboard(request):
         "user_display_name": full_name,
         "organization_name": organization_name,
         "user_role": role_display,
+        "selected_view": selected_view,
+        # Match tables
+        "match_inquiries": match_inquiries,
+        "pending_caregiver_matches": pending_caregiver_matches,
+        "pending_client_matches": pending_client_matches,
+        "active_matches": active_matches,
+        "declined_matches": declined_matches,
     })
 
 
@@ -631,6 +859,92 @@ def update_client_status(request, pk, status):
 
 
 @login_required
+def update_caregiver_status_by_profile(request, profile_id, status):
+    """
+    Approve/reject/pend a caregiver by their CaregiverProfile pk.
+    Creates an OrganizationCaregiver relationship if one doesn't exist yet,
+    then updates the status.  POST only.
+    """
+    from .models import CaregiverProfile
+
+    unauthorized_redirect = _redirect_if_not_admin_staff(request)
+    if unauthorized_redirect:
+        return unauthorized_redirect
+
+    if request.method != "POST":
+        return redirect("org_dashboard")
+
+    if status not in ALLOWED_STATUSES:
+        messages.error(request, "Invalid status.")
+        return redirect("org_dashboard")
+
+    active_org = get_active_organization(request)
+    caregiver_profile = get_object_or_404(CaregiverProfile, pk=profile_id)
+
+    org_caregiver, _ = OrganizationCaregiver.objects.get_or_create(
+        organization=active_org,
+        caregiver_profile=caregiver_profile,
+        defaults={"status": "pending"},
+    )
+
+    if status == "approved" and org_caregiver.status != "approved":
+        try:
+            approve_caregiver(org_caregiver, request.user)
+            messages.success(request, f"{caregiver_profile.user_profile.name} was approved.")
+        except Exception as e:
+            messages.error(request, f"Error approving: {str(e)}")
+    else:
+        org_caregiver.status = status
+        org_caregiver.save()
+        messages.success(request, f"{caregiver_profile.user_profile.name} was marked as {status}.")
+
+    return redirect("org_dashboard")
+
+
+@login_required
+def update_client_status_by_profile(request, profile_id, status):
+    """
+    Approve/reject/pend a client by their ClientProfile pk.
+    Creates an OrganizationClient relationship if one doesn't exist yet,
+    then updates the status.  POST only.
+    """
+    from .models import ClientProfile
+
+    unauthorized_redirect = _redirect_if_not_admin_staff(request)
+    if unauthorized_redirect:
+        return unauthorized_redirect
+
+    if request.method != "POST":
+        return redirect("org_dashboard")
+
+    if status not in ALLOWED_STATUSES:
+        messages.error(request, "Invalid status.")
+        return redirect("org_dashboard")
+
+    active_org = get_active_organization(request)
+    client_profile = get_object_or_404(ClientProfile, pk=profile_id)
+
+    org_client, _ = OrganizationClient.objects.get_or_create(
+        organization=active_org,
+        client_profile=client_profile,
+        defaults={"status": "pending"},
+    )
+
+    if status == "approved" and org_client.status != "approved":
+        try:
+            approve_client(org_client, request.user)
+            messages.success(request, f"{client_profile.user_profile.name} was approved.")
+        except Exception as e:
+            messages.error(request, f"Error approving: {str(e)}")
+    else:
+        org_client.status = status
+        org_client.save()
+        messages.success(request, f"{client_profile.user_profile.name} was marked as {status}.")
+
+    return redirect("org_dashboard")
+
+
+@login_required
 def switch_organization(request, org_id):
     """Switch the active organization in the user's session."""
     from .services import get_user_organizations
@@ -676,9 +990,11 @@ def caregiver_pool(request):
     ).values_list('caregiver_profile_id', flat=True)
     
     available_caregivers = all_caregivers.exclude(id__in=existing_ids)
-    
+
+    caregivers_page = Paginator(available_caregivers, 10).get_page(request.GET.get("caregivers_page", 1))
+
     return render(request, "registry/caregiver_pool.html", {
-        "caregivers": available_caregivers,
+        "caregivers": caregivers_page,
         "organization": active_org,
     })
 
@@ -710,9 +1026,11 @@ def client_pool(request):
     ).values_list('client_profile_id', flat=True)
     
     available_clients = all_clients.exclude(id__in=existing_ids)
-    
+
+    clients_page = Paginator(available_clients, 10).get_page(request.GET.get("clients_page", 1))
+
     return render(request, "registry/client_pool.html", {
-        "clients": available_clients,
+        "clients": clients_page,
         "organization": active_org,
     })
 

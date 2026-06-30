@@ -58,7 +58,7 @@ Client Application
                                     </div>
                                 {% endif %}
                             {% endfor %}
-                            
+
                             <!-- Account Activation Notice -->
                             <div class="notification is-info is-light" style="grid-column: 1 / -1;">
                                 <p><strong>Note:</strong> Your account will be created but inactive until approved by at least one organization. You'll receive an email when you're approved and can login.</p>
@@ -127,7 +127,7 @@ Client Application
 
                         <div class="app-form-grid">
                             {% for field in form %}
-                                {% if field.name in "languages_preferred,pathogen_protocol_preferences,preferences" %}
+                                {% if field.name in "languages_preferred,pathogen_protocol_preferences" %}
                                     <div class="field app-field{% if field.field.widget.input_type == 'checkbox' %} app-checkbox-field{% endif %}">
                                         <label class="label" for="{{ field.id_for_label }}">
                                             {{ field.label }}
@@ -148,10 +148,11 @@ Client Application
                     <div class="app-form-section" data-section="5">
                         <div class="app-form-section-header">
                             <h2 class="app-form-section-title">Schedule & Availability</h2>
-                            <p class="app-form-section-description">When do you need care services?</p>
+                            <p class="app-form-section-description">When do you need care services? Select all time blocks that apply for each day.</p>
                         </div>
 
-                        <div class="app-form-grid">
+                        <!-- Hours and flexibility fields -->
+                        <div class="app-form-grid" style="margin-bottom: 1.5rem;">
                             {% for field in form %}
                                 {% if field.name in "schedule_flexibility,hours_per_week" %}
                                     <div class="field app-field">
@@ -167,18 +168,17 @@ Client Application
                                     </div>
                                 {% endif %}
                             {% endfor %}
-                            
+                        </div>
+
+                        <!-- Day-by-day period checkboxes -->
+                        <div class="availability-grid">
                             {% for field in form %}
-                                {% if "_available" in field.name or "_start" in field.name or "_end" in field.name %}
-                                    <div class="field app-field">
-                                        <label class="label" for="{{ field.id_for_label }}">
-                                            {{ field.label }}
-                                            {% if field.field.required %}<span class="required-indicator" aria-label="required">*</span>{% endif %}
-                                        </label>
-                                        <div class="control">
+                                {% if "_periods" in field.name %}
+                                    <div class="availability-day-block">
+                                        <h3 class="availability-day-label">{{ field.label }}</h3>
+                                        <div class="availability-periods">
                                             {{ field }}
                                         </div>
-                                        {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
                                         {% if field.errors %}<div class="help is-danger" role="alert">{{ field.errors }}</div>{% endif %}
                                     </div>
                                 {% endif %}
@@ -203,6 +203,42 @@ Client Application
         </div>
     </div>
 </div>
+
+<style>
+.availability-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.availability-day-block {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.availability-day-label {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #363636;
+    margin-bottom: 0.75rem;
+    border-bottom: 2px solid #3273dc;
+    padding-bottom: 0.4rem;
+}
+
+.availability-periods ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.availability-periods li {
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+}
+</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {

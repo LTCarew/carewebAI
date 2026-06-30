@@ -86,6 +86,19 @@ urlpatterns = [
         name="update_client_status"
     ),
 
+    # Profile-based status update routes (create org relationship if needed)
+    path(
+        "dashboard/org/caregivers/profile/<int:profile_id>/<str:status>/",
+        views.update_caregiver_status_by_profile,
+        name="update_caregiver_profile_status"
+    ),
+
+    path(
+        "dashboard/org/clients/profile/<int:profile_id>/<str:status>/",
+        views.update_client_status_by_profile,
+        name="update_client_profile_status"
+    ),
+
     path(
         "switch-organization/<int:org_id>/",
         views.switch_organization,

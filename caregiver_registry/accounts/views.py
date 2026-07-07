@@ -22,8 +22,6 @@ def organization_signup(request):
                 # Create UserProfile with new structure
                 user_profile = UserProfile.objects.create(
                     user=user,
-                    name=user.get_full_name() or user.username,
-                    email=user.email,
                     phone='',  # Can be added to form if needed
                 )
 

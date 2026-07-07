@@ -39,20 +39,20 @@ Optional context (staff only):
             {# ── Person name column ── #}
             <td>
               {% if match_direction == "find_clients" %}
-                {# Showing clients — link to client detail (staff only) or just name #}
-                {% if role == "staff" or role == "admin" %}
-                  <a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.name }}</a>
+                {# Showing clients — staff always links; caregiver links to the client they found #}
+                {% if role == "staff" or role == "admin" or role == "caregiver" %}
+                  <a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.display_name }}</a>
                 {% else %}
-                  {{ result.client.user_profile.name }}
+                  {{ result.client.user_profile.display_name }}
                 {% endif %}
                 <br>
                 <span class="is-size-7 has-text-grey">{{ result.client.user_profile.city|default:"" }}</span>
               {% else %}
-                {# Showing caregivers — link to caregiver detail (staff only) or just name #}
-                {% if role == "staff" or role == "admin" %}
-                  <a href="{% url 'caregiver_detail' result.caregiver.pk %}">{{ result.caregiver.user_profile.name }}</a>
+                {# Showing caregivers — staff always links; client links to the caregiver they found #}
+                {% if role == "staff" or role == "admin" or role == "client" %}
+                  <a href="{% url 'caregiver_detail' result.caregiver.pk %}">{{ result.caregiver.user_profile.display_name }}</a>
                 {% else %}
-                  {{ result.caregiver.user_profile.name }}
+                  {{ result.caregiver.user_profile.display_name }}
                 {% endif %}
                 <br>
                 <span class="is-size-7 has-text-grey">{{ result.caregiver.user_profile.city|default:"" }}</span>
@@ -61,7 +61,7 @@ Optional context (staff only):
 
             {# ── Compatibility score ── #}
             <td>
-              <span class="tag {% if result.score >= 70 %}is-success{% elif result.score >= 40 %}is-warning{% else %}is-light{% endif %}">
+              <span class="tag {% if result.score >= 70 %}is-success{% elif result.score >= 40 %}is-warning{% else %}is-danger is-light{% endif %}">
                 {{ result.score }}
               </span>
             </td>

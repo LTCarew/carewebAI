@@ -83,7 +83,7 @@ def create_match(
     if existing:
         raise ValueError(
             f"An active or pending match already exists between "
-            f"{caregiver.user_profile.name} and {client.user_profile.name} "
+            f"{caregiver.user_profile.display_name} and {client.user_profile.display_name} "
             f"in {organization.name} (Match #{existing.pk})."
         )
 
@@ -801,9 +801,9 @@ def _notify_on_match_created(match):
         _send_notification(
             recipient=client_user,
             notification_type="match_request",
-            subject=f"New match request from {caregiver_user.name}",
+            subject=f"New match request from {caregiver_user.display_name}",
             message=(
-                f"{caregiver_user.name} has requested to be matched with you "
+                f"{caregiver_user.display_name} has requested to be matched with you "
                 f"through {org.name}. Please review this request in your dashboard."
             ),
             match=match,
@@ -811,10 +811,10 @@ def _notify_on_match_created(match):
         _notify_staff(
             organization=org,
             notification_type="match_request",
-            subject=f"New match inquiry: {caregiver_user.name} ↔ {client_user.name}",
+            subject=f"New match inquiry: {caregiver_user.display_name} ↔ {client_user.display_name}",
             message=(
-                f"{caregiver_user.name} (caregiver) has requested a match with "
-                f"{client_user.name} (client)."
+                f"{caregiver_user.display_name} (caregiver) has requested a match with "
+                f"{client_user.display_name} (client)."
             ),
             match=match,
         )
@@ -823,9 +823,9 @@ def _notify_on_match_created(match):
         _send_notification(
             recipient=caregiver_user,
             notification_type="match_request",
-            subject=f"New match request from {client_user.name}",
+            subject=f"New match request from {client_user.display_name}",
             message=(
-                f"{client_user.name} has requested to be matched with you "
+                f"{client_user.display_name} has requested to be matched with you "
                 f"through {org.name}. Please review this request in your dashboard."
             ),
             match=match,
@@ -833,10 +833,10 @@ def _notify_on_match_created(match):
         _notify_staff(
             organization=org,
             notification_type="match_request",
-            subject=f"New match inquiry: {caregiver_user.name} ↔ {client_user.name}",
+            subject=f"New match inquiry: {caregiver_user.display_name} ↔ {client_user.display_name}",
             message=(
-                f"{client_user.name} (client) has requested a match with "
-                f"{caregiver_user.name} (caregiver)."
+                f"{client_user.display_name} (client) has requested a match with "
+                f"{caregiver_user.display_name} (caregiver)."
             ),
             match=match,
         )
@@ -848,7 +848,7 @@ def _notify_on_match_created(match):
             subject=f"New proposed match from {org.name}",
             message=(
                 f"{org.name} has proposed a match between you and "
-                f"{client_user.name}. Please review and respond in your dashboard."
+                f"{client_user.display_name}. Please review and respond in your dashboard."
             ),
             match=match,
         )
@@ -858,7 +858,7 @@ def _notify_on_match_created(match):
             subject=f"New proposed match from {org.name}",
             message=(
                 f"{org.name} has proposed a match between you and "
-                f"{caregiver_user.name}. Please review and respond in your dashboard."
+                f"{caregiver_user.display_name}. Please review and respond in your dashboard."
             ),
             match=match,
         )
@@ -879,7 +879,7 @@ def _notify_on_party_response(match, party, response):
                 subject="Your match is now active!",
                 message=(
                     f"All parties have approved the match between "
-                    f"{caregiver_user.name} and {client_user.name} "
+                    f"{caregiver_user.display_name} and {client_user.display_name} "
                     f"through {org.name}."
                 ),
                 match=match,
@@ -893,22 +893,22 @@ def _notify_on_party_response(match, party, response):
                 notification_type="match_declined",
                 subject="A match has been declined",
                 message=(
-                    f"The match between {caregiver_user.name} and "
-                    f"{client_user.name} was declined by {party}."
+                    f"The match between {caregiver_user.display_name} and "
+                    f"{client_user.display_name} was declined by {party}."
                 ),
                 match=match,
             )
         return
 
     # Still pending — notify the remaining parties
-    party_labels = {"caregiver": caregiver_user.name, "client": client_user.name}
+    party_labels = {"caregiver": caregiver_user.display_name, "client": client_user.display_name}
     if party == "caregiver" and response == "approved":
         _send_notification(
             recipient=client_user,
             notification_type="match_approved",
-            subject=f"{caregiver_user.name} approved the match",
+            subject=f"{caregiver_user.display_name} approved the match",
             message=(
-                f"{caregiver_user.name} approved the match. "
+                f"{caregiver_user.display_name} approved the match. "
                 f"Awaiting your response."
             ),
             match=match,
@@ -917,9 +917,9 @@ def _notify_on_party_response(match, party, response):
         _send_notification(
             recipient=caregiver_user,
             notification_type="match_approved",
-            subject=f"{client_user.name} approved the match",
+            subject=f"{client_user.display_name} approved the match",
             message=(
-                f"{client_user.name} approved the match. "
+                f"{client_user.display_name} approved the match. "
                 f"Awaiting your response."
             ),
             match=match,
@@ -963,18 +963,18 @@ def _send_notification(*, recipient, notification_type, subject, message, match=
 
     # Attempt email delivery — fail gracefully
     try:
-        if recipient.email:
+        if recipient.auth_email:
             send_mail(
                 subject=subject,
                 message=message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[recipient.email],
+                recipient_list=[recipient.auth_email],
                 fail_silently=True,
             )
     except Exception:
         logger.warning(
             "Email notification failed for %s — in-app notification was saved.",
-            recipient.email,
+            recipient.auth_email,
         )
 
     return notif

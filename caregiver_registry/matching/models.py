@@ -105,7 +105,7 @@ class Notification(models.Model):
         ]
 
     def __str__(self):
-        return f"[{self.notification_type}] → {self.recipient.name}: {self.subject}"
+        return f"[{self.notification_type}] → {self.recipient.display_name}: {self.subject}"
 
 
 # ==============================================
@@ -262,8 +262,8 @@ class Match(models.Model):
     def __str__(self):
         return (
             f"Match #{self.pk}: "
-            f"{self.caregiver.user_profile.name} ↔ "
-            f"{self.client.user_profile.name} [{self.status}]"
+            f"{self.caregiver.user_profile.display_name} ↔ "
+            f"{self.client.user_profile.display_name} [{self.status}]"
         )
 
     # ── Status Transition Methods ─────────────────────────────────────────────

@@ -37,8 +37,8 @@ Client Pool - {{ organization.name }}
                 <tbody>
                     {% for client in clients %}
                         <tr>
-                            <td>{{ client.user_profile.name }}</td>
-                            <td>{{ client.user_profile.email }}</td>
+                            <td>{{ client.user_profile.display_name }}</td>
+                            <td>{{ client.user_profile.auth_email }}</td>
                             <td>{{ client.base_zip_code }}</td>
                             <td>{{ client.hours_per_week|default:"N/A" }}</td>
                             <td>

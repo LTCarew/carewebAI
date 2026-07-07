@@ -19,31 +19,53 @@ from .models import (
 User = get_user_model()
 
 
-def get_or_create_user_from_email(email, name=""):
+def get_or_create_user_from_email(email, first_name="", last_name="", name=""):
     """
     Get existing user by email or create a new one.
-    Username is set to email address.
+    Username is set to the email address.
     
     Args:
-        email: User's email address
-        name: User's full name (optional)
+        email:      User's email address
+        first_name: User's first name (preferred)
+        last_name:  User's last name  (preferred)
+        name:       Legacy full-name string; split into first/last when
+                    first_name/last_name are not supplied.
     
     Returns:
         User instance
     """
+    # Resolve first/last from legacy 'name' kwarg if not explicitly supplied
+    if not first_name and name:
+        parts = name.strip().split(" ", 1)
+        first_name = parts[0]
+        last_name = parts[1] if len(parts) > 1 else ""
+
     user, created = User.objects.get_or_create(
         email=email.lower(),
         defaults={
             'username': email.lower(),
             'email': email.lower(),
+            'first_name': first_name,
+            'last_name': last_name,
         }
     )
-    
+
     if created:
-        # Set an unusable password - user will need to reset via email
+        # Set an unusable password — user will authenticate via email link
         user.set_unusable_password()
         user.save()
-    
+    elif first_name or last_name:
+        # Update name on existing user if we have better info
+        changed = False
+        if first_name and not user.first_name:
+            user.first_name = first_name
+            changed = True
+        if last_name and not user.last_name:
+            user.last_name = last_name
+            changed = True
+        if changed:
+            user.save()
+
     return user
 
 
@@ -315,11 +337,11 @@ def send_coordinator_invite(client_profile, email, invited_by_user):
     signup_url = f"{settings.SITE_URL}{reverse('coordinator_signup', kwargs={'token': invite.token})}"
     
     # Send email
-    subject = f"Invitation to be a Support Coordinator for {client_profile.user_profile.name}"
+    subject = f"Invitation to be a Support Coordinator for {client_profile.user_profile.display_name}"
     message = f"""
 Hello,
 
-{client_profile.user_profile.name} has invited you to be their Support Coordinator on CareWeb AI.
+{client_profile.user_profile.display_name} has invited you to be their Support Coordinator on CareWeb AI.
 
 As a Support Coordinator, you can help manage care needs and assist with finding caregivers.
 
@@ -514,7 +536,7 @@ def send_approval_email(org_relationship):
     subject = f"Your {role_name} Application Has Been Approved - CareWeb AI"
     
     # Email body
-    message = f"""Hello {user_profile.name},
+    message = f"""Hello {user_profile.display_name},
 
 Great news! {organization.name} has approved your {role_name.lower()} application on CareWeb AI.
 
@@ -539,7 +561,7 @@ The CareWeb AI Team
         subject=subject,
         message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user_profile.email],
+        recipient_list=[user_profile.auth_email],
         fail_silently=False,
     )
 

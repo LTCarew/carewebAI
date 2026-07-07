@@ -37,8 +37,8 @@ Caregiver Pool - {{ organization.name }}
                 <tbody>
                     {% for caregiver in caregivers %}
                         <tr>
-                            <td>{{ caregiver.user_profile.name }}</td>
-                            <td>{{ caregiver.user_profile.email }}</td>
+                            <td>{{ caregiver.user_profile.display_name }}</td>
+                            <td>{{ caregiver.user_profile.auth_email }}</td>
                             <td>{{ caregiver.base_zip_code }}</td>
                             <td>{{ caregiver.get_rate_display }}</td>
                             <td>

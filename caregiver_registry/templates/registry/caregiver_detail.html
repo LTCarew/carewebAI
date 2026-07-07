@@ -15,7 +15,11 @@ Caregiver Details
         </div>
     </div>
     <div class="level-right">
-        <a href="{% url 'org_dashboard' %}" class="button is-light">Back to Dashboard</a>
+        {% if viewer_role == "client" %}
+          <a href="{% url 'client_dashboard' %}" class="button is-light">← Back to Dashboard</a>
+        {% else %}
+          <a href="{% url 'org_dashboard' %}" class="button is-light">← Back to Dashboard</a>
+        {% endif %}
     </div>
 </div>
 
@@ -25,8 +29,8 @@ Caregiver Details
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Identity & Contact</h2>
-                <p><strong>Name:</strong> {{ org_caregiver.caregiver_profile.user_profile.name }}</p>
-                <p><strong>Email:</strong> {{ org_caregiver.caregiver_profile.user_profile.email }}</p>
+                <p><strong>Name:</strong> {{ org_caregiver.caregiver_profile.user_profile.display_name }}</p>
+                <p><strong>Email:</strong> {{ org_caregiver.caregiver_profile.user_profile.auth_email }}</p>
                 <p><strong>Phone:</strong> {{ org_caregiver.caregiver_profile.user_profile.phone }}</p>
                 <p><strong>Pronouns:</strong> {{ org_caregiver.caregiver_profile.user_profile.get_pronouns_display|default:"Not provided" }}</p>
                 <p><strong>Contact preferences:</strong> {{ org_caregiver.caregiver_profile.user_profile.contact_preferences|join:", "|default:"None selected" }}</p>

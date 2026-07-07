@@ -89,7 +89,7 @@ def caregiver_request_match(request, client_profile_id):
         )
         messages.success(
             request,
-            f"Match request sent to {client_profile.user_profile.name}. "
+            f"Match request sent to {client_profile.user_profile.display_name}. "
             f"Awaiting client approval."
         )
     except ValueError as e:
@@ -149,7 +149,7 @@ def client_request_match(request, caregiver_profile_id):
         )
         messages.success(
             request,
-            f"Match request sent to {caregiver_profile.user_profile.name}. "
+            f"Match request sent to {caregiver_profile.user_profile.display_name}. "
             f"Awaiting caregiver approval."
         )
     except ValueError as e:
@@ -212,8 +212,8 @@ def staff_create_match(request):
         )
         messages.success(
             request,
-            f"Match proposed between {caregiver_profile.user_profile.name} and "
-            f"{client_profile.user_profile.name}. Awaiting caregiver and client approval."
+            f"Match proposed between {caregiver_profile.user_profile.display_name} and "
+            f"{client_profile.user_profile.display_name}. Awaiting caregiver and client approval."
         )
     except ValueError as e:
         messages.warning(request, str(e))

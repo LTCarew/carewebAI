@@ -257,7 +257,7 @@ class CaregiverProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"CaregiverProfile: {self.user_profile.name or self.user_profile.email}"
+        return f"CaregiverProfile: {self.user_profile.display_name}"
 
 
 class ClientProfile(models.Model):
@@ -290,7 +290,7 @@ class ClientProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"ClientProfile: {self.user_profile.name or self.user_profile.email}"
+        return f"ClientProfile: {self.user_profile.display_name}"
 
 
 # ==============================================
@@ -423,7 +423,7 @@ class SupportCoordinatorProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
-        return f"Support Coordinator: {self.user_profile.name}"
+        return f"Support Coordinator: {self.user_profile.display_name}"
     
     class Meta:
         verbose_name = "Support Coordinator Profile"
@@ -493,7 +493,10 @@ class ClientCoordinator(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.coordinator_profile.user_profile.name} → {self.client_profile.user_profile.name} ({self.status})"
+        return (
+            f"{self.coordinator_profile.user_profile.display_name} → "
+            f"{self.client_profile.user_profile.display_name} ({self.status})"
+        )
 
 
 class CoordinatorInvite(models.Model):
@@ -544,7 +547,7 @@ class CoordinatorInvite(models.Model):
         ]
     
     def __str__(self):
-        return f"Invite for {self.email} to support {self.client_profile.user_profile.name}"
+        return f"Invite for {self.email} to support {self.client_profile.user_profile.display_name}"
     
     def is_expired(self):
         """Check if the invitation has expired."""

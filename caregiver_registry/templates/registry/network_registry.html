@@ -50,7 +50,7 @@
               {% for rel in org_caregivers %}
                 <option value="{{ rel.caregiver_profile.pk }}"
                   {% if selected_caregiver and selected_caregiver.pk == rel.caregiver_profile.pk %}selected{% endif %}>
-                  {{ rel.caregiver_profile.user_profile.name }}
+                  {{ rel.caregiver_profile.user_profile.display_name }}
                 </option>
               {% endfor %}
             </select>
@@ -70,7 +70,7 @@
               {% for rel in org_clients %}
                 <option value="{{ rel.client_profile.pk }}"
                   {% if selected_client and selected_client.pk == rel.client_profile.pk %}selected{% endif %}>
-                  {{ rel.client_profile.user_profile.name }}
+                  {{ rel.client_profile.user_profile.display_name }}
                 </option>
               {% endfor %}
             </select>

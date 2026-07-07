@@ -32,12 +32,12 @@ Optional context:
       <tr>
         <td>
           <a href="{% url 'caregiver_detail' match.caregiver.id %}">
-            {{ match.caregiver.user_profile.name }}
+            {{ match.caregiver.user_profile.display_name }}
           </a>
         </td>
         <td>
           <a href="{% url 'client_detail' match.client.id %}">
-            {{ match.client.user_profile.name }}
+            {{ match.client.user_profile.display_name }}
           </a>
         </td>
         <td>

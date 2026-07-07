@@ -165,13 +165,21 @@ class Command(BaseCommand):
         if User.objects.filter(email=email).exists():
             raise CommandError(f"A user with email '{email}' already exists.")
 
-        user = User.objects.create_user(username=username, email=email, password=password)
+        parts = name.strip().split(" ", 1)
+        first_name = parts[0]
+        last_name = parts[1] if len(parts) > 1 else ""
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+        )
 
         user_profile, _ = UserProfile.objects.get_or_create(
             user=user,
             defaults={
-                'name': name,
-                'email': email,
                 'phone': '',
             }
         )
@@ -207,13 +215,21 @@ class Command(BaseCommand):
         if User.objects.filter(email=email).exists():
             raise CommandError(f"A user with email '{email}' already exists.")
 
-        user = User.objects.create_user(username=username, email=email, password=password)
+        parts = name.strip().split(" ", 1)
+        first_name = parts[0]
+        last_name = parts[1] if len(parts) > 1 else ""
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+        )
 
         user_profile, _ = UserProfile.objects.get_or_create(
             user=user,
             defaults={
-                'name': name,
-                'email': email,
                 'phone': '',
             }
         )
@@ -251,20 +267,25 @@ class Command(BaseCommand):
         phone = f"555-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
         
         # Create user and profile
-        user, _ = User.objects.get_or_create(
+        user, created = User.objects.get_or_create(
             email=email,
-            defaults={'username': email}
+            defaults={
+                'username': email,
+                'first_name': first,
+                'last_name': last,
+            }
         )
         user.set_password(SEEDED_USER_PASSWORD)
         user.is_active = True
+        if not created:
+            user.first_name = first
+            user.last_name = last
         user.save()
 
         user_profile, _ = UserProfile.objects.get_or_create(
             user=user,
             defaults={
-                'name': name,
                 'phone': phone,
-                'email': email,
                 'pronouns': random.choice(['she_her', 'he_him', 'they_them', '']),
                 'contact_preferences': random.sample(['phone', 'email', 'text'], k=random.randint(1, 2)),
             }
@@ -323,20 +344,25 @@ class Command(BaseCommand):
         phone = f"555-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
         
         # Create user and profile
-        user, _ = User.objects.get_or_create(
+        user, created = User.objects.get_or_create(
             email=email,
-            defaults={'username': email}
+            defaults={
+                'username': email,
+                'first_name': first,
+                'last_name': last,
+            }
         )
         user.set_password(SEEDED_USER_PASSWORD)
         user.is_active = True
+        if not created:
+            user.first_name = first
+            user.last_name = last
         user.save()
 
         user_profile, _ = UserProfile.objects.get_or_create(
             user=user,
             defaults={
-                'name': name,
                 'phone': phone,
-                'email': email,
                 'pronouns': random.choice(['she_her', 'he_him', 'they_them', '']),
                 'contact_preferences': random.sample(['phone', 'email', 'text'], k=random.randint(1, 2)),
                 'address': f"{random.randint(100, 9999)} Main St, Oakland, CA",

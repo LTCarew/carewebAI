@@ -93,7 +93,7 @@ def coordinator_signup(request, token):
             
             messages.success(
                 request,
-                f"Welcome! You are now a support coordinator for {invite.client_profile.user_profile.name}."
+                f"Welcome! You are now a support coordinator for {invite.client_profile.user_profile.display_name}."
             )
             
             # Log the user in (they now have an account)
@@ -181,7 +181,7 @@ def coordinator_permissions_update(request, relationship_id):
         
         messages.success(
             request,
-            f"Permissions updated for {relationship.coordinator_profile.user_profile.name}."
+            f"Permissions updated for {relationship.coordinator_profile.user_profile.display_name}."
         )
     
     return redirect("client_dashboard")
@@ -304,6 +304,8 @@ def caregiver_dashboard(request):
         messages.error(request, "Could not load your caregiver profile.")
         return redirect("home")
 
+    from django.db.models import Exists, OuterRef
+
     base_qs = Match.objects.filter(caregiver=caregiver_profile).select_related(
         "client__user_profile",
         "caregiver__user_profile",
@@ -314,8 +316,20 @@ def caregiver_dashboard(request):
         p = Paginator(qs, n)
         return p.get_page(request.GET.get(param, 1))
 
-    pending_my_approval   = paginate(base_qs.filter(status="pending", caregiver_status="pending"), "p_mine")
-    pending_client        = paginate(base_qs.filter(status="pending", caregiver_status="approved", client_status="pending"), "p_client")
+    # Exclude pending rows where an active match already exists for the same pair
+    active_pair_exists_cg = base_qs.filter(
+        caregiver_id=OuterRef("caregiver_id"),
+        client_id=OuterRef("client_id"),
+        status="active",
+    )
+    pending_qs_cg = (
+        base_qs.filter(status="pending")
+        .annotate(has_active_pair=Exists(active_pair_exists_cg))
+        .filter(has_active_pair=False)
+    )
+
+    pending_my_approval   = paginate(pending_qs_cg.filter(caregiver_status="pending"), "p_mine")
+    pending_client        = paginate(pending_qs_cg.filter(caregiver_status="approved", client_status="pending"), "p_client")
     active_matches        = paginate(base_qs.filter(status="active"), "p_active")
     declined_matches      = paginate(base_qs.filter(status__in=["declined", "cancelled"]).order_by("-updated_at"), "p_declined")
 
@@ -346,6 +360,8 @@ def client_dashboard(request):
         messages.error(request, "Could not load your client profile.")
         return redirect("home")
 
+    from django.db.models import Exists, OuterRef
+
     base_qs = Match.objects.filter(client=client_profile).select_related(
         "client__user_profile",
         "caregiver__user_profile",
@@ -356,8 +372,20 @@ def client_dashboard(request):
         p = Paginator(qs, n)
         return p.get_page(request.GET.get(param, 1))
 
-    pending_my_approval   = paginate(base_qs.filter(status="pending", client_status="pending"), "p_mine")
-    pending_caregiver     = paginate(base_qs.filter(status="pending", client_status="approved", caregiver_status="pending"), "p_cg")
+    # Exclude pending rows where an active match already exists for the same pair
+    active_pair_exists_cl = base_qs.filter(
+        caregiver_id=OuterRef("caregiver_id"),
+        client_id=OuterRef("client_id"),
+        status="active",
+    )
+    pending_qs_cl = (
+        base_qs.filter(status="pending")
+        .annotate(has_active_pair=Exists(active_pair_exists_cl))
+        .filter(has_active_pair=False)
+    )
+
+    pending_my_approval   = paginate(pending_qs_cl.filter(client_status="pending"), "p_mine")
+    pending_caregiver     = paginate(pending_qs_cl.filter(client_status="approved", caregiver_status="pending"), "p_cg")
     active_matches        = paginate(base_qs.filter(status="active"), "p_active")
     declined_matches      = paginate(base_qs.filter(status__in=["declined", "cancelled"]).order_by("-updated_at"), "p_declined")
 
@@ -524,12 +552,18 @@ def registry_network(request):
         org_caregivers_qs = OrganizationCaregiver.objects.filter(
             organization=organization,
             status="approved",
-        ).select_related("caregiver_profile__user_profile").order_by("caregiver_profile__user_profile__name")
+        ).select_related("caregiver_profile__user_profile__user").order_by(
+            "caregiver_profile__user_profile__user__last_name",
+            "caregiver_profile__user_profile__user__first_name",
+        )
 
         org_clients_qs = OrganizationClient.objects.filter(
             organization=organization,
             status="approved",
-        ).select_related("client_profile__user_profile").order_by("client_profile__user_profile__name")
+        ).select_related("client_profile__user_profile__user").order_by(
+            "client_profile__user_profile__user__last_name",
+            "client_profile__user_profile__user__first_name",
+        )
 
         selected_caregiver = None
         selected_client = None
@@ -626,8 +660,8 @@ def org_dashboard(request):
         caregiver_data.append({
             'pk': rel.pk if rel else None,
             'profile_id': caregiver.id,
-            'name': caregiver.user_profile.name,
-            'email': caregiver.user_profile.email,
+            'name': caregiver.user_profile.display_name,
+            'email': caregiver.user_profile.auth_email,
             'phone': caregiver.user_profile.phone or '',
             'status': rel.status if rel else 'pending',
             'relationship': rel
@@ -639,8 +673,8 @@ def org_dashboard(request):
         client_data.append({
             'pk': rel.pk if rel else None,
             'profile_id': client.id,
-            'name': client.user_profile.name,
-            'email': client.user_profile.email,
+            'name': client.user_profile.display_name,
+            'email': client.user_profile.auth_email,
             'phone': client.user_profile.phone or '',
             'status': rel.status if rel else 'pending',
             'relationship': rel
@@ -662,13 +696,29 @@ def org_dashboard(request):
         return p.get_page(request.GET.get(param, 1))
 
     if active_org:
+        from django.db.models import Exists, OuterRef
+
         match_base = Match.objects.filter(organization=active_org).select_related(
             "caregiver__user_profile", "client__user_profile", "organization"
         ).prefetch_related("selected_tags")
 
-        match_inquiries        = paginate(match_base.filter(status="pending"), "p_inq")
-        pending_caregiver_matches = paginate(match_base.filter(status="pending", caregiver_status="pending"), "p_cg")
-        pending_client_matches    = paginate(match_base.filter(status="pending", client_status="pending"), "p_cl")
+        # Subquery: does an active match already exist for this caregiver/client pair?
+        active_pair_exists = match_base.filter(
+            caregiver_id=OuterRef("caregiver_id"),
+            client_id=OuterRef("client_id"),
+            status="active",
+        )
+
+        # Pending matches must NOT have a corresponding active match for the same pair
+        pending_qs = (
+            match_base.filter(status="pending")
+            .annotate(has_active_pair=Exists(active_pair_exists))
+            .filter(has_active_pair=False)
+        )
+
+        match_inquiries           = paginate(pending_qs, "p_inq")
+        pending_caregiver_matches = paginate(pending_qs.filter(caregiver_status="pending"), "p_cg")
+        pending_client_matches    = paginate(pending_qs.filter(client_status="pending"), "p_cl")
         active_matches            = paginate(match_base.filter(status="active"), "p_act")
         declined_matches          = paginate(match_base.filter(status__in=["declined", "cancelled"]), "p_dec")
     else:
@@ -706,38 +756,71 @@ def org_dashboard(request):
 def caregiver_detail(request, pk):
     """
     Display caregiver application/profile details.
-    If pk is for a profile (not a relationship), create the relationship first.
-    """
-    from .models import CaregiverProfile
-    
-    unauthorized_redirect = _redirect_if_not_admin_staff(request)
-    if unauthorized_redirect:
-        return unauthorized_redirect
 
-    active_org = get_active_organization(request)
-    
-    # Try to get as OrganizationCaregiver first
+    Access rules:
+    - Admin / staff: full access; pk may be OrganizationCaregiver.pk or
+      CaregiverProfile.pk (relationship created if missing).
+    - Client: read-only view, allowed only when the client and caregiver
+      share at least one common organisation.  pk is treated as
+      CaregiverProfile.pk.  No new relationship is created.
+    """
+    from .models import CaregiverProfile, ClientProfile
+
+    is_admin_staff = _redirect_if_not_admin_staff(request) is None
+
+    # ── Admin / staff path ────────────────────────────────────────────────
+    if is_admin_staff:
+        active_org = get_active_organization(request)
+
+        try:
+            org_caregiver = OrganizationCaregiver.objects.select_related(
+                'caregiver_profile__user_profile',
+                'organization'
+            ).get(pk=pk)
+
+            if org_caregiver.organization != active_org:
+                raise OrganizationCaregiver.DoesNotExist
+
+        except OrganizationCaregiver.DoesNotExist:
+            caregiver_profile = get_object_or_404(CaregiverProfile, pk=pk)
+            org_caregiver, _ = OrganizationCaregiver.objects.get_or_create(
+                organization=active_org,
+                caregiver_profile=caregiver_profile,
+                defaults={'status': 'pending'}
+            )
+
+        return render(request, "registry/caregiver_detail.html", {
+            "org_caregiver": org_caregiver,
+            "viewer_role": "staff",
+        })
+
+    # ── Client path (read-only, shared-org required) ──────────────────────
     try:
-        org_caregiver = OrganizationCaregiver.objects.select_related(
-            'caregiver_profile__user_profile',
-            'organization'
-        ).get(pk=pk)
-        
-        # IMPORTANT: Verify it belongs to the active organization
-        if org_caregiver.organization != active_org:
-            raise OrganizationCaregiver.DoesNotExist
-            
-    except OrganizationCaregiver.DoesNotExist:
-        # Maybe pk is actually a profile_id, create the relationship
-        caregiver_profile = get_object_or_404(CaregiverProfile, pk=pk)
-        org_caregiver, created = OrganizationCaregiver.objects.get_or_create(
-            organization=active_org,
-            caregiver_profile=caregiver_profile,
-            defaults={'status': 'pending'}
-        )
+        viewer_client = ClientProfile.objects.get(user_profile__user=request.user)
+    except ClientProfile.DoesNotExist:
+        messages.error(request, "You don't have permission to view that profile.")
+        return redirect("dashboard_redirect")
+
+    caregiver_profile = get_object_or_404(CaregiverProfile, pk=pk)
+
+    # Find any OrganizationCaregiver row for this caregiver that is linked
+    # to an org the viewer's client also belongs to.
+    client_org_ids = OrganizationClient.objects.filter(
+        client_profile=viewer_client
+    ).values_list('organization_id', flat=True)
+
+    org_caregiver = OrganizationCaregiver.objects.filter(
+        caregiver_profile=caregiver_profile,
+        organization_id__in=client_org_ids,
+    ).select_related('caregiver_profile__user_profile', 'organization').first()
+
+    if not org_caregiver:
+        messages.error(request, "You don't have access to that caregiver's profile.")
+        return redirect("client_dashboard")
 
     return render(request, "registry/caregiver_detail.html", {
-        "org_caregiver": org_caregiver
+        "org_caregiver": org_caregiver,
+        "viewer_role": "client",
     })
 
 
@@ -745,38 +828,71 @@ def caregiver_detail(request, pk):
 def client_detail(request, pk):
     """
     Display client application/profile details.
-    If pk is for a profile (not a relationship), create the relationship first.
-    """
-    from .models import ClientProfile
-    
-    unauthorized_redirect = _redirect_if_not_admin_staff(request)
-    if unauthorized_redirect:
-        return unauthorized_redirect
 
-    active_org = get_active_organization(request)
-    
-    # Try to get as OrganizationClient first
+    Access rules:
+    - Admin / staff: full access; pk may be OrganizationClient.pk or
+      ClientProfile.pk (relationship created if missing).
+    - Caregiver: read-only view, allowed only when the caregiver and client
+      share at least one common organisation.  pk is treated as
+      ClientProfile.pk.  No new relationship is created.
+    """
+    from .models import ClientProfile, CaregiverProfile
+
+    is_admin_staff = _redirect_if_not_admin_staff(request) is None
+
+    # ── Admin / staff path ────────────────────────────────────────────────
+    if is_admin_staff:
+        active_org = get_active_organization(request)
+
+        try:
+            org_client = OrganizationClient.objects.select_related(
+                'client_profile__user_profile',
+                'organization'
+            ).get(pk=pk)
+
+            if org_client.organization != active_org:
+                raise OrganizationClient.DoesNotExist
+
+        except OrganizationClient.DoesNotExist:
+            client_profile = get_object_or_404(ClientProfile, pk=pk)
+            org_client, _ = OrganizationClient.objects.get_or_create(
+                organization=active_org,
+                client_profile=client_profile,
+                defaults={'status': 'pending'}
+            )
+
+        return render(request, "registry/client_detail.html", {
+            "org_client": org_client,
+            "viewer_role": "staff",
+        })
+
+    # ── Caregiver path (read-only, shared-org required) ───────────────────
     try:
-        org_client = OrganizationClient.objects.select_related(
-            'client_profile__user_profile',
-            'organization'
-        ).get(pk=pk)
-        
-        # IMPORTANT: Verify it belongs to the active organization
-        if org_client.organization != active_org:
-            raise OrganizationClient.DoesNotExist
-            
-    except OrganizationClient.DoesNotExist:
-        # Maybe pk is actually a profile_id, create the relationship
-        client_profile = get_object_or_404(ClientProfile, pk=pk)
-        org_client, created = OrganizationClient.objects.get_or_create(
-            organization=active_org,
-            client_profile=client_profile,
-            defaults={'status': 'pending'}
-        )
+        viewer_caregiver = CaregiverProfile.objects.get(user_profile__user=request.user)
+    except CaregiverProfile.DoesNotExist:
+        messages.error(request, "You don't have permission to view that profile.")
+        return redirect("dashboard_redirect")
+
+    client_profile = get_object_or_404(ClientProfile, pk=pk)
+
+    # Find any OrganizationClient row for this client that is linked to an
+    # org the viewer's caregiver also belongs to.
+    caregiver_org_ids = OrganizationCaregiver.objects.filter(
+        caregiver_profile=viewer_caregiver
+    ).values_list('organization_id', flat=True)
+
+    org_client = OrganizationClient.objects.filter(
+        client_profile=client_profile,
+        organization_id__in=caregiver_org_ids,
+    ).select_related('client_profile__user_profile', 'organization').first()
+
+    if not org_client:
+        messages.error(request, "You don't have access to that client's profile.")
+        return redirect("caregiver_dashboard")
 
     return render(request, "registry/client_detail.html", {
-        "org_client": org_client
+        "org_client": org_client,
+        "viewer_role": "caregiver",
     })
 
 
@@ -801,9 +917,9 @@ def update_caregiver_status(request, pk, status):
     if status == "approved" and org_caregiver.status != "approved":
         try:
             approve_caregiver(org_caregiver, request.user)
-            caregiver_name = org_caregiver.caregiver_profile.user_profile.name
+            caregiver_name = org_caregiver.caregiver_profile.user_profile.display_name
             messages.success(
-                request, 
+                request,
                 f"{caregiver_name} was approved."
             )
         except Exception as e:
@@ -813,7 +929,7 @@ def update_caregiver_status(request, pk, status):
         # For rejected or other status changes, just update the status
         org_caregiver.status = status
         org_caregiver.save()
-        caregiver_name = org_caregiver.caregiver_profile.user_profile.name
+        caregiver_name = org_caregiver.caregiver_profile.user_profile.display_name
         messages.success(request, f"{caregiver_name} was marked as {status}.")
 
     return redirect("caregiver_detail", pk=pk)
@@ -840,9 +956,9 @@ def update_client_status(request, pk, status):
     if status == "approved" and org_client.status != "approved":
         try:
             approve_client(org_client, request.user)
-            client_name = org_client.client_profile.user_profile.name
+            client_name = org_client.client_profile.user_profile.display_name
             messages.success(
-                request, 
+                request,
                 f"{client_name} was approved."
             )
         except Exception as e:
@@ -852,7 +968,7 @@ def update_client_status(request, pk, status):
         # For rejected or other status changes, just update the status
         org_client.status = status
         org_client.save()
-        client_name = org_client.client_profile.user_profile.name
+        client_name = org_client.client_profile.user_profile.display_name
         messages.success(request, f"{client_name} was marked as {status}.")
 
     return redirect("client_detail", pk=pk)
@@ -890,13 +1006,13 @@ def update_caregiver_status_by_profile(request, profile_id, status):
     if status == "approved" and org_caregiver.status != "approved":
         try:
             approve_caregiver(org_caregiver, request.user)
-            messages.success(request, f"{caregiver_profile.user_profile.name} was approved.")
+            messages.success(request, f"{caregiver_profile.user_profile.display_name} was approved.")
         except Exception as e:
             messages.error(request, f"Error approving: {str(e)}")
     else:
         org_caregiver.status = status
         org_caregiver.save()
-        messages.success(request, f"{caregiver_profile.user_profile.name} was marked as {status}.")
+        messages.success(request, f"{caregiver_profile.user_profile.display_name} was marked as {status}.")
 
     return redirect("org_dashboard")
 
@@ -933,13 +1049,13 @@ def update_client_status_by_profile(request, profile_id, status):
     if status == "approved" and org_client.status != "approved":
         try:
             approve_client(org_client, request.user)
-            messages.success(request, f"{client_profile.user_profile.name} was approved.")
+            messages.success(request, f"{client_profile.user_profile.display_name} was approved.")
         except Exception as e:
             messages.error(request, f"Error approving: {str(e)}")
     else:
         org_client.status = status
         org_client.save()
-        messages.success(request, f"{client_profile.user_profile.name} was marked as {status}.")
+        messages.success(request, f"{client_profile.user_profile.display_name} was marked as {status}.")
 
     return redirect("org_dashboard")
 
@@ -1065,10 +1181,10 @@ def add_caregiver_to_org(request, profile_id):
     if created:
         messages.success(
             request,
-            f"{caregiver_profile.user_profile.name} added to your organization for review."
+            f"{caregiver_profile.user_profile.display_name} added to your organization for review."
         )
     else:
-        messages.info(request, f"{caregiver_profile.user_profile.name} is already in your organization.")
+        messages.info(request, f"{caregiver_profile.user_profile.display_name} is already in your organization.")
     
     return redirect("org_dashboard")
 
@@ -1103,9 +1219,9 @@ def add_client_to_org(request, profile_id):
     if created:
         messages.success(
             request,
-            f"{client_profile.user_profile.name} added to your organization for review."
+        f"{client_profile.user_profile.display_name} added to your organization for review."
         )
     else:
-        messages.info(request, f"{client_profile.user_profile.name} is already in your organization.")
+        messages.info(request, f"{client_profile.user_profile.display_name} is already in your organization.")
     
     return redirect("org_dashboard")

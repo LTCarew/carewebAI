@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Invite Support Coordinator{% endblock %}
+
+{% block content %}
+<div class="columns is-centered">
+  <div class="column is-8-tablet is-6-desktop">
+
+    <div class="mb-5">
+      <h1 class="title is-3">Invite a Support Coordinator</h1>
+      <p class="subtitle is-6">
+        Enter the email address of the person you want to invite as your support coordinator.
+        They will receive an email with a link to create their account.
+      </p>
+    </div>
+
+    <div class="card app-card">
+      <div class="card-content">
+
+        {% if form.non_field_errors %}
+          <div class="notification is-danger is-light">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          {% for field in form %}
+            <div class="field">
+              <label class="label" for="{{ field.id_for_label }}">
+                {{ field.label }}
+                {% if field.field.required %}<span class="has-text-danger" aria-label="required"> *</span>{% endif %}
+              </label>
+              <div class="control">
+                {{ field }}
+              </div>
+              {% if field.help_text %}
+                <p class="help">{{ field.help_text }}</p>
+              {% endif %}
+              {% if field.errors %}
+                <div class="help is-danger" role="alert">{{ field.errors }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+
+          <div class="buttons mt-4">
+            <button type="submit" class="button is-link">Send Invitation</button>
+            <a href="{% url 'client_dashboard' %}" class="button is-light">Back to Dashboard</a>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

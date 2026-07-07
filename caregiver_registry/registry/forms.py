@@ -108,8 +108,9 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
     Creates User, UserProfile, and CaregiverProfile.
     Applicants go into a general pool — organizations add them later.
     """
-    # Account credentials
-    name = forms.CharField(max_length=255)
+    # Account credentials — identity lives on auth User
+    first_name = forms.CharField(max_length=150, label="First Name")
+    last_name = forms.CharField(max_length=150, label="Last Name")
     username = forms.CharField(
         max_length=150,
         help_text="Choose a username for your account"
@@ -228,14 +229,14 @@ class CaregiverApplicationForm(AvailabilityMixin, forms.Form):
             username=self.cleaned_data['username'],
             email=self.cleaned_data['email'],
             password=self.cleaned_data['password1'],
-            is_active=False
+            first_name=self.cleaned_data['first_name'],
+            last_name=self.cleaned_data['last_name'],
+            is_active=False,
         )
 
         user_profile = UserProfile.objects.create(
             user=user,
-            name=self.cleaned_data['name'],
             phone=self.cleaned_data['phone'],
-            email=self.cleaned_data['email'],
             pronouns=self.cleaned_data.get('pronouns', ''),
             contact_preferences=self.cleaned_data['contact_preferences'],
         )
@@ -271,8 +272,9 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
     Creates User, UserProfile, and ClientProfile.
     Applicants go into a general pool — organizations add them later.
     """
-    # Account credentials
-    name = forms.CharField(max_length=255)
+    # Account credentials — identity lives on auth User
+    first_name = forms.CharField(max_length=150, label="First Name")
+    last_name = forms.CharField(max_length=150, label="Last Name")
     username = forms.CharField(
         max_length=150,
         help_text="Choose a username for your account"
@@ -371,14 +373,14 @@ class ClientApplicationForm(AvailabilityMixin, forms.Form):
             username=self.cleaned_data['username'],
             email=self.cleaned_data['email'],
             password=self.cleaned_data['password1'],
-            is_active=False
+            first_name=self.cleaned_data['first_name'],
+            last_name=self.cleaned_data['last_name'],
+            is_active=False,
         )
 
         user_profile = UserProfile.objects.create(
             user=user,
-            name=self.cleaned_data['name'],
             phone=self.cleaned_data['phone'],
-            email=self.cleaned_data['email'],
             pronouns=self.cleaned_data.get('pronouns', ''),
             contact_preferences=self.cleaned_data['contact_preferences'],
             address=self.cleaned_data['address'],
@@ -423,13 +425,15 @@ class CoordinatorSignupForm(forms.Form):
     """
     Form for invited coordinators to sign up and accept the invitation.
     Creates User, UserProfile, SupportCoordinatorProfile, and ClientCoordinator records.
+    Identity (name, email) is saved on the auth User.
     """
     email = forms.EmailField(
         label="Email",
         widget=forms.EmailInput(attrs={'readonly': 'readonly'})
     )
 
-    name = forms.CharField(max_length=255, label="Full Name")
+    first_name = forms.CharField(max_length=150, label="First Name")
+    last_name = forms.CharField(max_length=150, label="Last Name")
     phone = forms.CharField(max_length=25, label="Phone Number")
 
     contact_preferences = forms.MultipleChoiceField(
@@ -475,15 +479,14 @@ class CoordinatorSignupForm(forms.Form):
 
         user = get_or_create_user_from_email(
             email=self.cleaned_data['email'],
-            name=self.cleaned_data['name']
+            first_name=self.cleaned_data['first_name'],
+            last_name=self.cleaned_data['last_name'],
         )
 
         user_profile, _ = UserProfile.objects.update_or_create(
             user=user,
             defaults={
-                'name': self.cleaned_data['name'],
                 'phone': self.cleaned_data['phone'],
-                'email': self.cleaned_data['email'],
                 'pronouns': self.cleaned_data.get('pronouns', ''),
                 'contact_preferences': self.cleaned_data['contact_preferences'],
             }

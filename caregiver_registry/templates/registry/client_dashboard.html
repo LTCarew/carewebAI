@@ -4,7 +4,7 @@
 <div class="mb-5">
   <h1 class="title is-2">Client Dashboard</h1>
   {% if client_profile %}
-    <p class="subtitle is-5">Welcome, {{ client_profile.user_profile.name }}.</p>
+    <p class="subtitle is-5">Welcome, {{ client_profile.user_profile.display_name }}.</p>
   {% endif %}
   <div class="buttons">
     <a href="{% url 'registry_network' %}" class="button is-link">View Caregiver Registry</a>
@@ -67,7 +67,7 @@
       <tbody>
         {% for rel in coordinators %}
         <tr>
-          <td>{{ rel.coordinator_profile.user_profile.name }}</td>
+          <td>{{ rel.coordinator_profile.user_profile.display_name }}</td>
           <td><span class="tag is-info is-light">{{ rel.status }}</span></td>
           <td>{{ rel.can_edit_profile|yesno:"Yes,No" }}</td>
           <td>{{ rel.can_approve_caregivers|yesno:"Yes,No" }}</td>

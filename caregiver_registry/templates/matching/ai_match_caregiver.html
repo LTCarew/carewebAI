@@ -49,7 +49,7 @@
         <tbody>
           {% for result in results %}
           <tr>
-            <td><a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.name }}</a></td>
+            <td><a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.display_name }}</a></td>
             <td>
               <span class="tag {% if result.score >= 70 %}is-success{% elif result.score >= 40 %}is-warning{% else %}is-light{% endif %}">
                 {{ result.score }}

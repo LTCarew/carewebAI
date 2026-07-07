@@ -23,8 +23,10 @@ CONTACT_PREFERENCES = [
 
 class UserProfile(models.Model):
     """
-    Stores shared identity and contact information for a user.
-    Created when a user's application is approved.
+    Stores shared contact/preference information for a user.
+    Identity fields (name, email) come from the linked auth User:
+        user.first_name, user.last_name, user.email
+    Use the display_name / auth_email properties for display.
     """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -32,10 +34,8 @@ class UserProfile(models.Model):
         related_name="profile"
     )
 
-    # Shared identity fields
-    name = models.CharField(max_length=255, blank=True)
+    # Contact / preferences — identity lives on auth User
     phone = models.CharField(max_length=25, blank=True)
-    email = models.EmailField(blank=True)
 
     pronouns = models.CharField(
         max_length=50,
@@ -51,8 +51,22 @@ class UserProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)
 
+    # ------------------------------------------------------------------
+    # Convenience read-only properties — sourced from auth User
+    # ------------------------------------------------------------------
+
+    @property
+    def display_name(self):
+        """Full name from auth User, falling back to username."""
+        return self.user.get_full_name().strip() or self.user.username
+
+    @property
+    def auth_email(self):
+        """Email from auth User."""
+        return self.user.email
+
     def __str__(self):
-        return f"{self.name} ({self.user.email})"
+        return f"{self.display_name} ({self.user.email})"
 
 
 class StaffProfile(models.Model):
@@ -76,4 +90,4 @@ class StaffProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"StaffProfile: {self.user_profile.name or self.user_profile.email}"
+        return f"StaffProfile: {self.user_profile.display_name}"

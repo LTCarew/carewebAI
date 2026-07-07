@@ -22,7 +22,7 @@
                   {% for rel in org_caregivers %}
                     <option value="{{ rel.caregiver_profile.pk }}"
                       {% if selected_caregiver and selected_caregiver.pk == rel.caregiver_profile.pk %}selected{% endif %}>
-                      {{ rel.caregiver_profile.user_profile.name }}
+                      {{ rel.caregiver_profile.user_profile.display_name }}
                     </option>
                   {% endfor %}
                 </select>
@@ -40,7 +40,7 @@
                   {% for rel in org_clients %}
                     <option value="{{ rel.client_profile.pk }}"
                       {% if selected_client and selected_client.pk == rel.client_profile.pk %}selected{% endif %}>
-                      {{ rel.client_profile.user_profile.name }}
+                      {{ rel.client_profile.user_profile.display_name }}
                     </option>
                   {% endfor %}
                 </select>
@@ -90,8 +90,8 @@
         <tbody>
           {% for result in results %}
           <tr>
-            <td><a href="{% url 'caregiver_detail' result.caregiver.pk %}">{{ result.caregiver.user_profile.name }}</a></td>
-            <td><a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.name }}</a></td>
+            <td><a href="{% url 'caregiver_detail' result.caregiver.pk %}">{{ result.caregiver.user_profile.display_name }}</a></td>
+            <td><a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.display_name }}</a></td>
             <td>
               <span class="tag {% if result.score >= 70 %}is-success{% elif result.score >= 40 %}is-warning{% else %}is-light{% endif %}">
                 {{ result.score }}

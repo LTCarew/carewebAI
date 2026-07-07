@@ -6,7 +6,7 @@
 <div class="mb-5">
   <h1 class="title is-2">Caregiver Dashboard</h1>
   {% if caregiver_profile %}
-    <p class="subtitle is-5">Welcome, {{ caregiver_profile.user_profile.name }}.</p>
+    <p class="subtitle is-5">Welcome, {{ caregiver_profile.user_profile.display_name }}.</p>
   {% endif %}
   <div class="buttons">
     <a href="{% url 'registry_network' %}" class="button is-link">View Client Registry</a>

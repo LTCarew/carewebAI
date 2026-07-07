@@ -7,20 +7,30 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
+# ─────────────────────────────────────────────────────────────
+# SECURITY
+# ─────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG") == "True"
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = []
+# In production (Cloud Run), set ALLOWED_HOSTS as a comma-separated env var:
+#   e.g. ALLOWED_HOSTS=careweb-xyz-uc.a.run.app,carewebai.org
+_allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()] or (
+    ["localhost", "127.0.0.1"] if DEBUG else []
+)
 
-# Application definition
+# Trust the HTTPS termination proxy in Cloud Run
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{host}"
+    for host in ALLOWED_HOSTS
+    if not host.startswith("localhost") and not host.startswith("127.")
+]
 
+# ─────────────────────────────────────────────────────────────
+# APPLICATION DEFINITION
+# ─────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -38,6 +48,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise must come right after SecurityMiddleware
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -65,64 +77,85 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# ─────────────────────────────────────────────────────────────
+# DATABASE
+# DEBUG=True  → SQLite (local dev, zero config)
+# DEBUG=False → PostgreSQL (production via Cloud SQL)
+# ─────────────────────────────────────────────────────────────
+if DEBUG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME':     os.getenv('POSTGRES_DB',       'careweb'),
+            'USER':     os.getenv('POSTGRES_USER',     'careweb_user'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+            'HOST':     os.getenv('POSTGRES_HOST',     '127.0.0.1'),
+            'PORT':     os.getenv('POSTGRES_PORT',     '5432'),
+            'OPTIONS': {
+                # Cloud SQL Auth Proxy (unix socket) for Cloud Run.
+                # When POSTGRES_HOST starts with '/' it is treated as a socket path.
+                # For direct TCP (e.g. local staging), leave POSTGRES_HOST as an IP.
+            },
+        }
+    }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
-
+# ─────────────────────────────────────────────────────────────
+# PASSWORD VALIDATION
+# ─────────────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
+# ─────────────────────────────────────────────────────────────
+# INTERNATIONALIZATION
+# ─────────────────────────────────────────────────────────────
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
-STATIC_URL = "static/"
+# ─────────────────────────────────────────────────────────────
+# STATIC FILES
+# WhiteNoise serves compressed/cached static files from STATIC_ROOT
+# ─────────────────────────────────────────────────────────────
+STATIC_URL = "/static/"
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+# collectstatic writes here; WhiteNoise serves from here in production
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# ─────────────────────────────────────────────────────────────
+# AUTHENTICATION
+# ─────────────────────────────────────────────────────────────
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard_redirect"
 LOGOUT_REDIRECT_URL = "/"
 
-# Email settings
+# ─────────────────────────────────────────────────────────────
+# EMAIL
+# ─────────────────────────────────────────────────────────────
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
@@ -135,13 +168,10 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'CareWeb AI <noreply@carewe
 # Site URL for invitation links
 SITE_URL = os.getenv("SITE_URL", "http://localhost:8000")
 
-# =============================================================================
-# OpenAI / ChatGPT settings
-# =============================================================================
+# ─────────────────────────────────────────────────────────────
+# OPENAI / AI MATCHING
+# ─────────────────────────────────────────────────────────────
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-# Model used for AI-assisted matching. gpt-4o-mini gives a good speed/cost balance.
 OPENAI_MATCH_MODEL = os.getenv("OPENAI_MATCH_MODEL", "gpt-4o-mini")
-# Timeout in seconds for ChatGPT API calls during matching.
 OPENAI_MATCH_TIMEOUT = int(os.getenv("OPENAI_MATCH_TIMEOUT", "15"))
-# Set to "false" to disable ChatGPT scoring even when the API key is present.
 OPENAI_MATCH_ENABLED = os.getenv("OPENAI_MATCH_ENABLED", "true").lower() == "true"

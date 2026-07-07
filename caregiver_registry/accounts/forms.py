@@ -1,9 +1,14 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import AuthenticationForm
 
 
 User = get_user_model()
 
+
+# ==============================================
+# Organization Admin Signup Form
+# ==============================================
 
 class OrganizationAdminSignupForm(forms.Form):
     # Organization fields
@@ -53,3 +58,29 @@ class OrganizationAdminSignupForm(forms.Form):
             last_name=self.cleaned_data["last_name"],
         )
         return user
+
+
+# ==============================================
+# Custom Login Form
+# ==============================================
+
+class CareWebLoginForm(AuthenticationForm):
+    """
+    Custom login form that shows a friendlier 'approval pending' message
+    when a user's credentials are correct but their account is inactive.
+    """
+
+    def confirm_login_allowed(self, user):
+        """
+        Override to provide a context-aware error message.
+        Django's default raises a generic 'inactive' message; we swap that
+        for an approval-pending message so users understand what's happening.
+        We only reach this method when the password is already verified,
+        so showing this message does not leak account existence.
+        """
+        if not user.is_active:
+            raise forms.ValidationError(
+                "Your account is pending approval. Once an organization approves "
+                "your application you'll receive an email and can log in.",
+                code="approval_pending",
+            )

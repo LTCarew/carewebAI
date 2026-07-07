@@ -28,7 +28,7 @@
 </div>
 {% endif %}
 
-{% if pending_caregiver_matches or pending_client_matches %}
+{% comment %} {% if pending_caregiver_matches or pending_client_matches %}
 <div class="columns">
   {% if pending_caregiver_matches %}
   <div class="column">
@@ -55,7 +55,7 @@
   </div>
   {% endif %}
 </div>
-{% endif %}
+{% endif %} {% endcomment %}
 
 {% if active_matches %}
 <div class="card app-card mb-4">

@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 
 {% block title %}
-Client Pool - {{ organization.name }}
+Clients Pool - {{ organization.name }}
 {% endblock %}
 
 {% block content %}
 
 <div class="mb-5">
     <h1 class="title is-2">
-        Browse Client Pool
+        Browse Clients Pool
     </h1>
     <p class="subtitle">
         Add clients from the general pool to {{ organization.name }}
@@ -56,7 +56,7 @@ Client Pool - {{ organization.name }}
                     {% empty %}
                         <tr>
                             <td colspan="5">
-                                No available clients in the pool. All clients have already been added to your organization.
+                        No available people in the pool. All have already been added to your organization.
                             </td>
                         </tr>
                     {% endfor %}

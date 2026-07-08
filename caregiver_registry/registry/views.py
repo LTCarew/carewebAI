@@ -301,7 +301,7 @@ def caregiver_dashboard(request):
     try:
         caregiver_profile = request.user.profile.caregiver_profile
     except Exception:
-        messages.error(request, "Could not load your caregiver profile.")
+        messages.error(request, "Could not load your careworker profile.")
         return redirect("home")
 
     from django.db.models import Exists, OuterRef
@@ -357,7 +357,7 @@ def client_dashboard(request):
     try:
         client_profile = request.user.profile.client_profile
     except Exception:
-        messages.error(request, "Could not load your client profile.")
+        messages.error(request, "Could not load your profile.")
         return redirect("home")
 
     from django.db.models import Exists, OuterRef
@@ -450,7 +450,7 @@ def registry_network(request):
         try:
             caregiver_profile = request.user.profile.caregiver_profile
         except Exception:
-            messages.error(request, "Could not load your caregiver profile.")
+            messages.error(request, "Could not load your careworker profile.")
             return redirect("dashboard_redirect")
 
         # Get all orgs this caregiver is approved in (their network scope)
@@ -502,7 +502,7 @@ def registry_network(request):
         try:
             client_profile = request.user.profile.client_profile
         except Exception:
-            messages.error(request, "Could not load your client profile.")
+            messages.error(request, "Could not load your profile.")
             return redirect("dashboard_redirect")
 
         client_org_ids = OrganizationClient.objects.filter(
@@ -815,7 +815,7 @@ def caregiver_detail(request, pk):
     ).select_related('caregiver_profile__user_profile', 'organization').first()
 
     if not org_caregiver:
-        messages.error(request, "You don't have access to that caregiver's profile.")
+        messages.error(request, "You don't have access to that careworker's profile.")
         return redirect("client_dashboard")
 
     return render(request, "registry/caregiver_detail.html", {
@@ -887,7 +887,7 @@ def client_detail(request, pk):
     ).select_related('client_profile__user_profile', 'organization').first()
 
     if not org_client:
-        messages.error(request, "You don't have access to that client's profile.")
+        messages.error(request, "You don't have access to that person's profile.")
         return redirect("caregiver_dashboard")
 
     return render(request, "registry/client_detail.html", {

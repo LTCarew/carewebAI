@@ -56,13 +56,13 @@ def caregiver_request_match(request, client_profile_id):
     user_role = get_user_primary_role(request.user, organization)
 
     if user_role != "caregiver":
-        messages.error(request, "Only caregivers can initiate match requests from the client registry.")
+        messages.error(request, "Only careworkers can initiate match requests from the client registry.")
         return redirect("registry_network")
 
     try:
         caregiver_profile = request.user.profile.caregiver_profile
     except Exception:
-        messages.error(request, "Could not find your caregiver profile.")
+        messages.error(request, "Could not find your careworker profile.")
         return redirect("registry_network")
 
     client_profile = get_object_or_404(ClientProfile, pk=client_profile_id)
@@ -117,13 +117,13 @@ def client_request_match(request, caregiver_profile_id):
     user_role = get_user_primary_role(request.user, organization)
 
     if user_role != "client":
-        messages.error(request, "Only clients can initiate match requests from the caregiver registry.")
+        messages.error(request, "Only clients can initiate match requests from the careworker registry.")
         return redirect("registry_network")
 
     try:
         client_profile = request.user.profile.client_profile
     except Exception:
-        messages.error(request, "Could not find your client profile.")
+        messages.error(request, "Could not find your profile.")
         return redirect("registry_network")
 
     caregiver_profile = get_object_or_404(CaregiverProfile, pk=caregiver_profile_id)
@@ -186,7 +186,7 @@ def staff_create_match(request):
     notes = request.POST.get("notes", "")
 
     if not caregiver_id or not client_id:
-        messages.error(request, "Please select both a caregiver and a client.")
+        messages.error(request, "Please select both a careworker and a client.")
         return redirect("registry_network")
 
     caregiver_profile = get_object_or_404(CaregiverProfile, pk=caregiver_id)
@@ -337,13 +337,13 @@ def ai_match_for_caregiver(request):
     user_role = get_user_primary_role(request.user, organization)
 
     if user_role != "caregiver":
-        messages.error(request, "Only caregivers can use this feature.")
+        messages.error(request, "Only careworkers can use this feature.")
         return redirect("dashboard_redirect")
 
     try:
         caregiver_profile = request.user.profile.caregiver_profile
     except Exception:
-        messages.error(request, "Could not find your caregiver profile.")
+        messages.error(request, "Could not find your careworker profile.")
         return redirect("caregiver_dashboard")
 
     tag_ids = request.GET.getlist("tag_ids")
@@ -382,7 +382,7 @@ def ai_match_for_client(request):
     try:
         client_profile = request.user.profile.client_profile
     except Exception:
-        messages.error(request, "Could not find your client profile.")
+        messages.error(request, "Could not find your profile.")
         return redirect("client_dashboard")
 
     tag_ids = request.GET.getlist("tag_ids")

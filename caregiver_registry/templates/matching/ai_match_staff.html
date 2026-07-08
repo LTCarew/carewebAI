@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}AI Assisted Match — Staff{% endblock %}
+{% block title %}AI Assisted Match — Staff Admin{% endblock %}
 {% block content %}
 <div class="mb-4">
-  <h1 class="title is-2">✨ AI Assisted Match — Staff</h1>
-  <p class="subtitle is-6">Score caregiver-client pairings by compatibility. Optionally filter by tags or lock in one side.</p>
+  <h1 class="title is-2">✨ AI Assisted Match — Staff Admin</h1>
+  <p class="subtitle is-6">Score careworker–client pairings by compatibility. Optionally filter by tags or lock in one side.</p>
   <a href="{% url 'org_dashboard' %}" class="button is-light is-small">← Back to Dashboard</a>
 </div>
 
@@ -14,11 +14,11 @@
       <div class="columns">
         <div class="column">
           <div class="field">
-            <label class="label">Caregiver (optional)</label>
+            <label class="label">Careworker (optional)</label>
             <div class="control">
               <div class="select is-fullwidth">
                 <select name="caregiver_id">
-                  <option value="">— All Caregivers —</option>
+                  <option value="">— All Careworkers —</option>
                   {% for rel in org_caregivers %}
                     <option value="{{ rel.caregiver_profile.pk }}"
                       {% if selected_caregiver and selected_caregiver.pk == rel.caregiver_profile.pk %}selected{% endif %}>
@@ -36,7 +36,7 @@
             <div class="control">
               <div class="select is-fullwidth">
                 <select name="client_id">
-                  <option value="">— All Clients —</option>
+                   <option value="">— All Clients —</option>
                   {% for rel in org_clients %}
                     <option value="{{ rel.client_profile.pk }}"
                       {% if selected_client and selected_client.pk == rel.client_profile.pk %}selected{% endif %}>
@@ -79,7 +79,7 @@
       <table class="table is-fullwidth is-striped is-hoverable">
         <thead>
           <tr>
-            <th>Caregiver</th>
+            <th>Careworker</th>
             <th>Client</th>
             <th>Score</th>
             <th>Matched Tags</th>

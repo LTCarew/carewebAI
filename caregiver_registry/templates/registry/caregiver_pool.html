@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
 {% block title %}
-Caregiver Pool - {{ organization.name }}
+Careworker Pool - {{ organization.name }}
 {% endblock %}
 
 {% block content %}
 
 <div class="mb-5">
     <h1 class="title is-2">
-        Browse Caregiver Pool
+        Browse Careworker Pool
     </h1>
     <p class="subtitle">
-        Add caregivers from the general pool to {{ organization.name }}
+        Add careworkers from the general pool to {{ organization.name }}
     </p>
     <a href="{% url 'org_dashboard' %}" class="button is-light">
         ← Back to Dashboard
@@ -20,7 +20,7 @@ Caregiver Pool - {{ organization.name }}
 
 <div class="card app-card">
     <div class="card-content">
-        <h2 class="title is-4">Available Caregivers</h2>
+        <h2 class="title is-4">Available Careworkers</h2>
         
         <div class="table-container">
             <table class="table is-fullwidth is-striped is-hoverable">
@@ -56,7 +56,7 @@ Caregiver Pool - {{ organization.name }}
                     {% empty %}
                         <tr>
                             <td colspan="5">
-                                No available caregivers in the pool. All caregivers have already been added to your organization.
+                        No available careworkers in the pool. All careworkers have already been added to your organization.
                             </td>
                         </tr>
                     {% endfor %}

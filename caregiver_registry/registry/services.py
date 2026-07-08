@@ -343,7 +343,7 @@ Hello,
 
 {client_profile.user_profile.display_name} has invited you to be their Support Coordinator on CareWeb AI.
 
-As a Support Coordinator, you can help manage care needs and assist with finding caregivers.
+As a Support Coordinator, you can help manage care needs and assist with finding careworkers (people providing support).
 
 To accept this invitation and create your account, please click the link below:
 
@@ -521,7 +521,7 @@ def send_approval_email(org_relationship):
     
     if is_caregiver:
         user_profile = org_relationship.caregiver_profile.user_profile
-        role_name = "Caregiver"
+        role_name = "Careworker"
     else:
         user_profile = org_relationship.client_profile.user_profile
         role_name = "Client"
@@ -547,8 +547,8 @@ Username: {user.username}
 
 Once logged in, you'll be able to:
 - View your dashboard
-- Browse the {"client" if is_caregiver else "caregiver"} registry
-- Connect with potential {"clients" if is_caregiver else "caregivers"}
+- Browse the {"client" if is_caregiver else "careworker"} registry
+- Connect with potential {"clients" if is_caregiver else "careworkers"}
 
 Welcome to the CareWeb AI network!
 

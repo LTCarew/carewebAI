@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}AI Assisted Match — Best Caregivers for You{% endblock %}
+{% block title %}AI Assisted Match — Best Careworkers for You{% endblock %}
 {% block content %}
 <div class="mb-4">
   <h1 class="title is-2">✨ AI Assisted Match</h1>
-  <p class="subtitle is-6">Top caregiver suggestions based on your care needs, availability, and selected tags.</p>
+  <p class="subtitle is-6">Top careworker suggestions based on your care needs, availability, and selected tags.</p>
   <a href="{% url 'client_dashboard' %}" class="button is-light is-small">← Back to Dashboard</a>
 </div>
 
@@ -33,11 +33,11 @@
 {% if results %}
 <div class="card app-card">
   <div class="card-content">
-    <h2 class="title is-5">Top Caregiver Matches</h2>
+    <h2 class="title is-5">Top Careworker Matches</h2>
     <div class="table-container">
       <table class="table is-fullwidth is-striped is-hoverable">
         <thead>
-          <tr><th>Caregiver</th><th>Score</th><th>Matched Tags</th><th>AI Reasoning</th><th>Action</th></tr>
+          <tr><th>Careworker</th><th>Score</th><th>Matched Tags</th><th>AI Reasoning</th><th>Action</th></tr>
         </thead>
         <tbody>
           {% for result in results %}

@@ -7,7 +7,7 @@
     <p class="subtitle is-5">Welcome, {{ client_profile.user_profile.display_name }}.</p>
   {% endif %}
   <div class="buttons">
-    <a href="{% url 'registry_network' %}" class="button is-link">View Caregiver Registry</a>
+    <a href="{% url 'registry_network' %}" class="button is-link">View Careworker Registry</a>
     <a href="{% url 'ai_match_client' %}" class="button is-info">✨ AI Assisted Match</a>
     <a href="{% url 'coordinator_invite_send' %}" class="button is-light">Invite Support Coordinator</a>
   </div>
@@ -33,8 +33,8 @@
 
 <div class="card app-card mb-4">
   <div class="card-content">
-    <h2 class="title is-5">🧑‍⚕️ Pending Caregiver Approval</h2>
-    {% with matches=pending_caregiver viewer_role="client" show_actions=False page_param="p_cg" empty_message="No matches waiting for caregiver approval." %}
+    <h2 class="title is-5">🧑‍⚕️ Pending Careworker Approval</h2>
+    {% with matches=pending_caregiver viewer_role="client" show_actions=False page_param="p_cg" empty_message="No matches waiting for careworker approval." %}
       {% include "matching/_match_table.html" %}
     {% endwith %}
   </div>
@@ -63,7 +63,7 @@
   <div class="card-content">
     <h2 class="title is-5">Support Coordinators</h2>
     <table class="table is-fullwidth is-striped">
-      <thead><tr><th>Name</th><th>Status</th><th>Can Edit Profile</th><th>Can Approve Caregivers</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Name</th><th>Status</th><th>Can Edit Profile</th><th>Can Approve Careworkers</th><th>Actions</th></tr></thead>
       <tbody>
         {% for rel in coordinators %}
         <tr>
@@ -75,7 +75,7 @@
             <form method="post" action="{% url 'coordinator_permissions_update' rel.pk %}">
               {% csrf_token %}
               <label><input type="checkbox" name="can_edit_profile" {% if rel.can_edit_profile %}checked{% endif %}> Edit</label>
-              <label class="ml-2"><input type="checkbox" name="can_approve_caregivers" {% if rel.can_approve_caregivers %}checked{% endif %}> Approve</label>
+              <label class="ml-2"><input type="checkbox" name="can_approve_caregivers" {% if rel.can_approve_caregivers %}checked{% endif %}> Approve Careworkers</label>
               <button type="submit" class="button is-small is-link ml-2">Save</button>
             </form>
           </td>

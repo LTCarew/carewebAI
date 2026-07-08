@@ -20,7 +20,7 @@
 <div class="card app-card mb-5">
   <div class="card-content">
     <h2 class="title is-4">🔍 Pending Matches</h2>
-    <p class="is-size-7 has-text-grey mb-3">Matches awaiting caregiver and/or client approval. Staff can cancel matches but do not approve or decline them.</p>
+    <p class="is-size-7 has-text-grey mb-3">Matches awaiting careworker and/or client approval. Staff Admin can cancel matches but do not approve or decline them.</p>
     {% with matches=match_inquiries viewer_role="staff" show_actions=True page_param="p_inq" empty_message="No pending matches." %}
       {% include "matching/_match_table.html" %}
     {% endwith %}
@@ -82,7 +82,7 @@
 <!-- View toggle -->
 <div class="buttons mb-3 mt-5">
   <a href="?view=caregivers" class="button {% if selected_view == 'caregivers' %}is-link{% else %}is-light{% endif %}">
-    Caregivers 
+    Careworkers 
   </a>
   <a href="?view=clients" class="button {% if selected_view == 'clients' %}is-link{% else %}is-light{% endif %}">
     Clients 
@@ -95,7 +95,7 @@
   <div class="card-content">
     <div class="level">
       <div class="level-left">
-        <h2 class="title is-4">Caregiver Applications</h2>
+        <h2 class="title is-4">Careworker Applications</h2>
       </div>
       <div class="level-right">
         <div class="tags">
@@ -156,7 +156,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5">No caregiver applications yet.</td></tr>
+          <tr><td colspan="5">No careworker applications yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -233,7 +233,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5">No client applications yet.</td></tr>
+          <tr><td colspan="5">No applications yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

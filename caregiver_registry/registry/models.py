@@ -11,7 +11,7 @@ def default_invite_expiration():
 # Invites
 # ==============================================
 ROLE_CHOICES = [
-    ("caregiver", "Caregiver"),
+    ("caregiver", "Careworker"),
     ("client", "Client"),
 ]
 

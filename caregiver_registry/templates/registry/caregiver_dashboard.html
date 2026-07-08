@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Caregiver Dashboard{% endblock %}
+{% block title %}Careworker Dashboard{% endblock %}
 
 {% block content %}
 <div class="mb-5">
-  <h1 class="title is-2">Caregiver Dashboard</h1>
+  <h1 class="title is-2">Careworker Dashboard</h1>
   {% if caregiver_profile %}
     <p class="subtitle is-5">Welcome, {{ caregiver_profile.user_profile.display_name }}.</p>
   {% endif %}
   <div class="buttons">
-    <a href="{% url 'registry_network' %}" class="button is-link">View Client Registry</a>
+    <a href="{% url 'registry_network' %}" class="button is-link">View Clients</a>
     <a href="{% url 'ai_match_caregiver' %}" class="button is-info">✨ AI Assisted Match</a>
   </div>
 </div>
@@ -37,7 +37,7 @@
 <div class="card app-card mb-4">
   <div class="card-content">
     <h2 class="title is-5">👤 Pending Client Approval</h2>
-    {% with matches=pending_client viewer_role="caregiver" show_actions=False page_param="p_client" empty_message="No matches waiting for client approval." %}
+    {% with matches=pending_client viewer_role="caregiver" show_actions=False page_param="p_client" empty_message="No matches waiting for approval." %}
       {% include "matching/_match_table.html" %}
     {% endwith %}
   </div>

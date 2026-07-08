@@ -28,11 +28,11 @@
         <div class="buttons has-addons">
           <a href="?match_type=find_clients{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
              class="button {% if match_direction == 'find_clients' %}is-link is-selected{% else %}is-light{% endif %}">
-            Caregiver → show matching Clients
+            Careworker → show matching Clients
           </a>
           <a href="?match_type=find_caregivers{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
              class="button {% if match_direction == 'find_caregivers' %}is-link is-selected{% else %}is-light{% endif %}">
-            Client → show matching Caregivers
+            Client → show matching Careworkers
           </a>
         </div>
       </div>
@@ -42,11 +42,11 @@
       {# ── Caregiver dropdown (shown only when direction is find_clients) ── #}
       {% if match_direction == "find_clients" %}
       <div class="field">
-        <label class="label">Select Caregiver</label>
+        <label class="label">Select Careworker</label>
         <div class="control">
           <div class="select is-fullwidth">
             <select name="caregiver_id">
-              <option value="">— Select a Caregiver —</option>
+              <option value="">— Select a Careworker —</option>
               {% for rel in org_caregivers %}
                 <option value="{{ rel.caregiver_profile.pk }}"
                   {% if selected_caregiver and selected_caregiver.pk == rel.caregiver_profile.pk %}selected{% endif %}>
@@ -111,11 +111,11 @@
   {# Tags were selected but no person chosen yet (or no results) #}
   {% if match_direction == "find_clients" and not selected_caregiver %}
   <div class="notification is-warning is-light">
-    Please select a caregiver above to see matching clients.
+    Please select a careworker above to see matching clients.
   </div>
   {% elif match_direction == "find_caregivers" and not selected_client %}
   <div class="notification is-warning is-light">
-    Please select a client above to see matching caregivers.
+    Please select a client above to see matching careworkers.
   </div>
   {% else %}
   <div class="notification is-light">
@@ -132,14 +132,14 @@
 
 
 <!-- ═══════════════════════════════════════════════════════
-     CAREGIVER: Select tags to find matching clients
+     CAREWORKER: Select tags to find matching clients
      ════════════════════════════════════════════════════════ -->
 {% if user_role == "caregiver" %}
 <div class="card app-card mb-5">
   <div class="card-content">
-    <h2 class="title is-5">Find Matching Clients</h2>
+    <h2 class="title is-5">Find Clients</h2>
     <p class="is-size-7 has-text-grey mb-4">
-      Select the care criteria you can provide. You'll see clients in your network that match.
+      Select the care criteria you can provide. You'll see people in your network that match.
     </p>
 
     <form method="get" action="">
@@ -175,21 +175,21 @@
 </div>
 {% else %}
 <div class="notification is-light">
-  Select at least one care tag above to find matching clients in your network.
+  Select at least one care tag above to find clients in your network.
 </div>
 {% endif %}
 {% endif %}{# end caregiver #}
 
 
 <!-- ═══════════════════════════════════════════════════════
-     CLIENT: Select tags to find matching caregivers
+     CLIENT: Select tags to find matching careworkers
      ════════════════════════════════════════════════════════ -->
 {% if user_role == "client" %}
 <div class="card app-card mb-5">
   <div class="card-content">
-    <h2 class="title is-5">Find Matching Caregivers</h2>
+    <h2 class="title is-5">Find Matching Careworkers</h2>
     <p class="is-size-7 has-text-grey mb-4">
-      Select the care needs you require. You'll see caregivers in your network that can help.
+      Select the care needs you require. You'll see careworkers in your network that can help.
     </p>
 
     <form method="get" action="">
@@ -209,7 +209,7 @@
       </div>
 
       <div class="buttons mt-4">
-        <button type="submit" class="button is-primary">Find Caregivers</button>
+        <button type="submit" class="button is-primary">Find Careworkers</button>
         <a href="{% url 'registry_network' %}" class="button is-light">Reset</a>
         <a href="{% url 'ai_match_client' %}" class="button is-info">✨ AI Assisted Match</a>
       </div>
@@ -221,11 +221,11 @@
   {% include "registry/_registry_match_results.html" with results=match_results role=user_role match_direction=match_direction selected_tag_ids=selected_tag_ids %}
 {% elif selected_tag_ids %}
 <div class="notification is-light">
-  No matching caregivers found for the selected criteria.
+  No matching careworkers found for the selected criteria.
 </div>
 {% else %}
 <div class="notification is-light">
-  Select at least one care need above to find matching caregivers in your network.
+  Select at least one care need above to find matching careworkers in your network.
 </div>
 {% endif %}
 {% endif %}{# end client #}

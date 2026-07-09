@@ -97,8 +97,8 @@
 
       <div class="buttons mt-4">
         <button type="submit" class="button is-primary">Find Matches</button>
+        <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
         <a href="?match_type={{ match_direction }}" class="button is-light">Reset</a>
-        <a href="{% url 'ai_match_staff' %}" class="button is-info">✨ AI Assisted Match</a>
       </div>
     </form>
   </div>
@@ -160,8 +160,8 @@
 
       <div class="buttons mt-4">
         <button type="submit" class="button is-primary">Find Clients</button>
+        <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
         <a href="{% url 'registry_network' %}" class="button is-light">Reset</a>
-        <a href="{% url 'ai_match_caregiver' %}" class="button is-info">✨ AI Assisted Match</a>
       </div>
     </form>
   </div>
@@ -210,8 +210,8 @@
 
       <div class="buttons mt-4">
         <button type="submit" class="button is-primary">Find Careworkers</button>
+        <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
         <a href="{% url 'registry_network' %}" class="button is-light">Reset</a>
-        <a href="{% url 'ai_match_client' %}" class="button is-info">✨ AI Assisted Match</a>
       </div>
     </form>
   </div>

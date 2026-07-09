@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}AI Assisted Match — Staff Admin{% endblock %}
 {% block content %}
+
 <div class="mb-4">
   <h1 class="title is-2">✨ AI Assisted Match — Staff Admin</h1>
   <p class="subtitle is-6">Score careworker–client pairings by compatibility. Optionally filter by tags or lock in one side.</p>
@@ -10,7 +11,7 @@
 <div class="card app-card mb-4">
   <div class="card-content">
     <h2 class="title is-6">Matching Parameters</h2>
-    <form method="get" action="">
+    <form id="ai-filter-form" method="get" action="">
       <div class="columns">
         <div class="column">
           <div class="field">
@@ -125,4 +126,5 @@
 {% else %}
 <div class="notification is-light">No results yet. Select parameters and click "Run AI Match".</div>
 {% endif %}
+
 {% endblock %}

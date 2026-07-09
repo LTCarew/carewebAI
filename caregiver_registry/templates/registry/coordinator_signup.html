@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Accept Coordinator Invitation{% endblock %}
+{% block title %}Accept Support Person Invitation{% endblock %}
 
 {% block content %}
 <div class="columns is-centered">
   <div class="column is-10-tablet is-8-desktop">
 
     <div class="mb-5">
-      <h1 class="title is-3">Accept Support Coordinator Invitation</h1>
+      <h1 class="title is-3">Accept Support Person Invitation</h1>
       {% if invite %}
         <p class="subtitle is-6">
-          You have been invited to become a support coordinator
+          You have been invited to become a support person
           {% if invite.client_profile %}
             for <strong>{{ invite.client_profile.user_profile.display_name }}</strong>
           {% endif %}.
@@ -74,7 +74,7 @@
             {% if form.pronouns.errors %}<div class="help is-danger" role="alert">{{ form.pronouns.errors }}</div>{% endif %}
           </div>
 
-          <h2 class="title is-5 mt-5 mb-3">Coordinator Details</h2>
+          <h2 class="title is-5 mt-5 mb-3">Support Person Details</h2>
 
           <!-- Relationship to client -->
           <div class="field">

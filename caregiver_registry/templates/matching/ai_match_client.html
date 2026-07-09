@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}AI Assisted Match — Best Careworkers for You{% endblock %}
 {% block content %}
+
 <div class="mb-4">
   <h1 class="title is-2">✨ AI Assisted Match</h1>
   <p class="subtitle is-6">Top careworker suggestions based on your care needs, availability, and selected tags.</p>
@@ -10,7 +11,7 @@
 <div class="card app-card mb-4">
   <div class="card-content">
     <h2 class="title is-6">Filter by Tags</h2>
-    <form method="get" action="">
+    <form id="ai-filter-form" method="get" action="">
       <div class="field is-grouped is-grouped-multiline">
         {% for tag in all_tags %}
           <div class="control">
@@ -74,4 +75,5 @@
 {% else %}
 <div class="notification is-light">No suggestions found. Try adjusting your tags or check back later.</div>
 {% endif %}
+
 {% endblock %}

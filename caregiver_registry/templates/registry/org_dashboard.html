@@ -79,6 +79,74 @@
 </div>
 {% endif %}
 
+<!-- Schedules oversight -->
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <h2 class="title is-4">📅 All Schedules</h2>
+    {% if all_schedules %}
+    <div class="table-container" role="region" aria-label="All schedules">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Person Looking for Support</th>
+            <th scope="col">Person Providing Support</th>
+            <th scope="col">Support Person</th>
+            <th scope="col">Status</th>
+            <th scope="col">Submitted</th>
+            <th scope="col">Entries</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sched in all_schedules %}
+          <tr>
+            <td>{{ sched.client.user_profile.display_name }}</td>
+            <td>{{ sched.caregiver.user_profile.display_name }}</td>
+            <td>
+              {% if sched.support_person %}
+                {{ sched.support_person.user_profile.display_name }}
+              {% else %}
+                <span class="has-text-grey-light">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sched.status == "approved" %}
+                <span class="tag is-success is-light">Approved</span>
+              {% elif sched.status == "rejected" %}
+                <span class="tag is-danger is-light">Rejected</span>
+              {% elif sched.status == "cancelled" %}
+                <span class="tag is-light">Cancelled</span>
+              {% elif sched.status == "partially_approved" %}
+                <span class="tag is-warning is-light">Partial</span>
+              {% elif sched.status == "submitted" %}
+                <span class="tag is-info is-light">Submitted</span>
+              {% else %}
+                <span class="tag is-warning is-light">Draft</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sched.submitted_at %}
+                {{ sched.submitted_at|date:"N j, Y" }}
+              {% else %}
+                <span class="has-text-grey-light">—</span>
+              {% endif %}
+            </td>
+            <td>{{ sched.entries.count }}</td>
+            <td>
+              <a href="{% url 'schedule_detail' sched.pk %}" class="button is-light is-small">View</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/_pagination.html" with page_obj=all_schedules page_param="schedules_page" %}
+    {% else %}
+      <p class="has-text-grey-light is-italic">No schedules have been created yet.</p>
+    {% endif %}
+  </div>
+</div>
+
 <!-- View toggle -->
 <div class="buttons mb-3 mt-5">
   <a href="?view=caregivers" class="button {% if selected_view == 'caregivers' %}is-link{% else %}is-light{% endif %}">

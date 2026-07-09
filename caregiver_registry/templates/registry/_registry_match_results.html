@@ -16,11 +16,48 @@ Optional context (staff only):
 <div class="card app-card">
   <div class="card-content">
 
+    {# ── Section heading ── #}
     {% if match_direction == "find_clients" %}
-    <h2 class="title is-5">Matching Clients</h2>
+    <h2 class="title is-5">✨ AI Matching — Clients</h2>
     {% else %}
-    <h2 class="title is-5">Matching Careworkers</h2>
+    <h2 class="title is-5">✨ AI Matching — Careworkers</h2>
     {% endif %}
+
+    {# ── Score key ── #}
+    <div class="notification is-light mb-4 p-4" style="border-left: 4px solid #7e6b8f;">
+      <p class="has-text-weight-bold mb-2 is-size-6">📊 How to read the compatibility score</p>
+      <p class="is-size-7 mb-1">
+        Scores are calculated out of <strong>100</strong> based on matching care tags, schedule availability,
+        location, and other profile criteria. AI reasoning is provided to explain the top factors.
+      </p>
+      <div class="columns is-mobile is-vcentered mt-2">
+        <div class="column is-narrow">
+          <span class="tag is-success is-medium" style="font-weight:700; min-width:3.5rem;">70–100</span>
+        </div>
+        <div class="column">
+          <span class="has-text-weight-semibold">Strong match</span>
+          <span class="has-text-grey is-size-7"> — High compatibility. Good candidate to request or propose a match.</span>
+        </div>
+      </div>
+      <div class="columns is-mobile is-vcentered">
+        <div class="column is-narrow">
+          <span class="tag is-warning is-medium" style="font-weight:700; min-width:3.5rem; color:#1a1a1a;">40–69</span>
+        </div>
+        <div class="column">
+          <span class="has-text-weight-semibold">Possible match</span>
+          <span class="has-text-grey is-size-7"> — Some compatibility. Review the AI reasoning and tags before deciding.</span>
+        </div>
+      </div>
+      <div class="columns is-mobile is-vcentered">
+        <div class="column is-narrow">
+          <span class="tag is-danger is-light is-medium" style="font-weight:700; min-width:3.5rem;">0–39</span>
+        </div>
+        <div class="column">
+          <span class="has-text-weight-semibold">Low match</span>
+          <span class="has-text-grey is-size-7"> — Limited compatibility. Likely needs significant review before proposing.</span>
+        </div>
+      </div>
+    </div>
 
     <div class="table-container" role="region" aria-label="Match Results">
       <table class="table is-fullwidth is-striped is-hoverable">
@@ -29,7 +66,7 @@ Optional context (staff only):
             <th scope="col">Name</th>
             <th scope="col">Score</th>
             <th scope="col">Matched Tags</th>
-            <th scope="col">Reasoning</th>
+            <th scope="col">AI Reasoning</th>
             <th scope="col">Action</th>
           </tr>
         </thead>
@@ -59,11 +96,18 @@ Optional context (staff only):
               {% endif %}
             </td>
 
-            {# ── Compatibility score ── #}
-            <td>
-              <span class="tag {% if result.score >= 70 %}is-success{% elif result.score >= 40 %}is-warning{% else %}is-danger is-light{% endif %}">
-                {{ result.score }}
-              </span>
+            {# ── Compatibility score + plain-language label ── #}
+            <td style="white-space:nowrap;">
+              {% if result.score >= 70 %}
+                <span class="tag is-success" style="font-weight:700;">{{ result.score }}</span>
+                <br><span class="is-size-7 has-text-grey">Strong</span>
+              {% elif result.score >= 40 %}
+                <span class="tag is-warning" style="font-weight:700; color:#1a1a1a;">{{ result.score }}</span>
+                <br><span class="is-size-7 has-text-grey">Possible</span>
+              {% else %}
+                <span class="tag is-danger is-light" style="font-weight:700;">{{ result.score }}</span>
+                <br><span class="is-size-7 has-text-grey">Low</span>
+              {% endif %}
             </td>
 
             {# ── Criteria matches (selected tags that hit the profile) ── #}

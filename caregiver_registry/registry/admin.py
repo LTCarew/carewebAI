@@ -8,7 +8,9 @@ from .models import (
     SupportCoordinatorProfile,
     ClientCoordinator,
     CoordinatorInvite,
-    Invite
+    Invite,
+    Schedule,
+    ScheduleEntry,
 )
 
 
@@ -134,3 +136,25 @@ class CoordinatorInviteAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Invite)
+
+
+class ScheduleEntryInline(admin.TabularInline):
+    model = ScheduleEntry
+    extra = 0
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(Schedule)
+class ScheduleAdmin(admin.ModelAdmin):
+    list_display = ("pk", "client", "caregiver", "support_person", "status", "submitted_at", "created_at")
+    list_filter = ("status", "organization")
+    search_fields = ("client__user_profile__user__last_name", "caregiver__user_profile__user__last_name")
+    readonly_fields = ("created_at", "updated_at", "submitted_at", "cancelled_at")
+    inlines = [ScheduleEntryInline]
+
+
+@admin.register(ScheduleEntry)
+class ScheduleEntryAdmin(admin.ModelAdmin):
+    list_display = ("schedule", "day_of_week", "start_time", "end_time", "caregiver_status", "support_person_status")
+    list_filter = ("caregiver_status", "support_person_status", "day_of_week")
+    readonly_fields = ("created_at", "updated_at", "caregiver_reviewed_at", "support_person_reviewed_at")

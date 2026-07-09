@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block content %}
+
+<div class="mb-5">
+  <h1 class="title is-2">{{ page_title }}</h1>
+  {% if schedule %}
+    <p class="subtitle is-6">
+      Schedule #{{ schedule.pk }} &mdash; status:
+      <span class="tag is-warning is-light">{{ schedule.get_status_display }}</span>
+    </p>
+  {% endif %}
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="notification {% if message.tags == 'error' %}is-danger{% elif message.tags == 'warning' %}is-warning{% else %}is-info{% endif %} mb-4">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <form method="post">
+      {% csrf_token %}
+
+      <h2 class="title is-5 mb-3">Schedule Details</h2>
+
+      {% for field in form %}
+        <div class="field mb-4">
+          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          <div class="control">
+            {{ field }}
+          </div>
+          {% if field.help_text %}
+            <p class="help">{{ field.help_text }}</p>
+          {% endif %}
+          {% for error in field.errors %}
+            <p class="help is-danger">{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endfor %}
+
+      <hr>
+
+      <h2 class="title is-5 mb-3">Day / Time Entries</h2>
+      <p class="is-size-7 has-text-grey mb-3">
+        Add one or more recurring days and times. Each entry will require individual approval from
+        the careworker and, if assigned, the support person.
+      </p>
+
+      {{ formset.management_form }}
+
+      <div id="entry-formset">
+        {% for entry_form in formset %}
+          <div class="box mb-3 entry-row">
+            <div class="columns is-vcentered">
+              <div class="column is-4">
+                <div class="field">
+                  <label class="label">{{ entry_form.day_of_week.label }}</label>
+                  <div class="control">{{ entry_form.day_of_week }}</div>
+                  {% for error in entry_form.day_of_week.errors %}
+                    <p class="help is-danger">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="column is-3">
+                <div class="field">
+                  <label class="label">{{ entry_form.start_time.label }}</label>
+                  <div class="control">{{ entry_form.start_time }}</div>
+                  {% for error in entry_form.start_time.errors %}
+                    <p class="help is-danger">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="column is-3">
+                <div class="field">
+                  <label class="label">{{ entry_form.end_time.label }}</label>
+                  <div class="control">{{ entry_form.end_time }}</div>
+                  {% for error in entry_form.end_time.errors %}
+                    <p class="help is-danger">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              </div>
+              {% if action == "edit" %}
+              <div class="column is-2">
+                <div class="field mt-4">
+                  <label class="checkbox">
+                    {{ entry_form.DELETE }}
+                    <span class="ml-1 has-text-danger is-size-7">Remove</span>
+                  </label>
+                </div>
+              </div>
+              {% endif %}
+            </div>
+            {% if entry_form.non_field_errors %}
+              <p class="help is-danger">{{ entry_form.non_field_errors }}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="buttons mt-4">
+        <button type="submit" class="button is-primary">
+          {% if action == "create" %}Save Draft{% else %}Save Changes{% endif %}
+        </button>
+        {% if schedule %}
+          <a href="{% url 'schedule_detail' schedule.pk %}" class="button is-light">Cancel</a>
+        {% else %}
+          <a href="{% url 'client_dashboard' %}" class="button is-light">Cancel</a>
+        {% endif %}
+      </div>
+
+    </form>
+  </div>
+</div>
+
+{% endblock %}

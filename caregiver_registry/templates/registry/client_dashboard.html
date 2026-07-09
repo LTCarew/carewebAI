@@ -9,7 +9,7 @@
   <div class="buttons">
     <a href="{% url 'registry_network' %}" class="button is-link">View Careworker Registry</a>
     <a href="{% url 'ai_match_client' %}" class="button is-info">✨ AI Assisted Match</a>
-    <a href="{% url 'coordinator_invite_send' %}" class="button is-light">Invite Support Coordinator</a>
+    <a href="{% url 'coordinator_invite_send' %}" class="button is-light">Invite Support Person</a>
   </div>
 </div>
 
@@ -58,10 +58,101 @@
   </div>
 </div>
 
+<!-- My Schedules -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level">
+      <div class="level-left">
+        <h2 class="title is-5">📅 My Schedules</h2>
+      </div>
+      <div class="level-right">
+        <a href="{% url 'schedule_create' %}" class="button is-link is-small">+ Create Schedule</a>
+      </div>
+    </div>
+    {% if my_schedules %}
+    <div class="table-container" role="region" aria-label="My schedules">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Careworker</th>
+            <th scope="col">Support Person</th>
+            <th scope="col">Status</th>
+            <th scope="col">Submitted</th>
+            <th scope="col">Entries</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sched in my_schedules %}
+          <tr>
+            <td>{{ sched.caregiver.user_profile.display_name }}</td>
+            <td>
+              {% if sched.support_person %}
+                {{ sched.support_person.user_profile.display_name }}
+              {% else %}
+                <span class="has-text-grey-light">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sched.status == "approved" %}
+                <span class="tag is-success is-light">Approved</span>
+              {% elif sched.status == "rejected" %}
+                <span class="tag is-danger is-light">Rejected</span>
+              {% elif sched.status == "cancelled" %}
+                <span class="tag is-light">Cancelled</span>
+              {% elif sched.status == "partially_approved" %}
+                <span class="tag is-warning is-light">Partial</span>
+              {% elif sched.status == "submitted" %}
+                <span class="tag is-info is-light">Submitted</span>
+              {% else %}
+                <span class="tag is-warning is-light">Draft</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sched.submitted_at %}
+                {{ sched.submitted_at|date:"N j, Y" }}
+              {% else %}
+                <span class="has-text-grey-light">—</span>
+              {% endif %}
+            </td>
+            <td>{{ sched.entries.count }}</td>
+            <td>
+              <div class="buttons are-small">
+                <a href="{% url 'schedule_detail' sched.pk %}" class="button is-light is-small">View</a>
+                {% if sched.is_editable_by_client %}
+                  <a href="{% url 'schedule_edit' sched.pk %}" class="button is-link is-small">Edit</a>
+                  <form method="post" action="{% url 'schedule_submit' sched.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button is-success is-small">Submit</button>
+                  </form>
+                {% endif %}
+                {% if sched.status not in "cancelled,approved" and sched.is_submitted %}
+                  <form method="post" action="{% url 'schedule_cancel' sched.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="button is-danger is-light is-small">Cancel</button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/_pagination.html" with page_obj=my_schedules page_param="schedules_page" %}
+    {% else %}
+      <p class="has-text-grey-light is-italic">
+        No schedules yet.
+        <a href="{% url 'schedule_create' %}">Create one</a> after you have an active match.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
 {% if coordinators %}
 <div class="card app-card mt-5">
   <div class="card-content">
-    <h2 class="title is-5">Support Coordinators</h2>
+    <h2 class="title is-5">Support Persons</h2>
     <table class="table is-fullwidth is-striped">
       <thead><tr><th>Name</th><th>Status</th><th>Can Edit Profile</th><th>Can Approve Careworkers</th><th>Actions</th></tr></thead>
       <tbody>

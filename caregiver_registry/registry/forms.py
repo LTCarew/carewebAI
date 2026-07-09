@@ -515,3 +515,141 @@ class CoordinatorSignupForm(forms.Form):
         invite.save()
 
         return client_coordinator
+
+
+# ==============================================
+# Scheduling Forms
+# ==============================================
+
+class ScheduleForm(forms.Form):
+    """
+    Form for a client to create or edit a draft Schedule.
+    Caregiver is chosen from the client's active matches.
+    Support person is chosen from the client's active coordinators (optional).
+    """
+    caregiver = forms.ModelChoiceField(
+        queryset=None,  # set in __init__
+        label="Careworker",
+        help_text="Select the careworker from one of your active matches",
+    )
+    support_person = forms.ModelChoiceField(
+        queryset=None,  # set in __init__
+        required=False,
+        label="Support Person",
+        help_text="Optionally select a support person to co-approve this schedule",
+    )
+    match = forms.ModelChoiceField(
+        queryset=None,  # set in __init__
+        required=False,
+        label="Linked Match",
+        help_text="Select the active match this schedule is for",
+    )
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Notes",
+        help_text="Optional notes or context for this schedule",
+    )
+
+    def __init__(self, *args, client_profile=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import CaregiverProfile, SupportCoordinatorProfile, ClientCoordinator
+        from matching.models import Match
+
+        if client_profile is not None:
+            # Active matches for this client
+            active_matches = Match.objects.filter(
+                client=client_profile,
+                status="active",
+            ).select_related("caregiver__user_profile")
+
+            caregiver_ids = active_matches.values_list("caregiver_id", flat=True)
+            self.fields["caregiver"].queryset = CaregiverProfile.objects.filter(
+                id__in=caregiver_ids
+            ).select_related("user_profile")
+            self.fields["caregiver"].label_from_instance = (
+                lambda obj: obj.user_profile.display_name
+            )
+
+            # Active coordinators for this client
+            active_coordinator_ids = ClientCoordinator.objects.filter(
+                client_profile=client_profile,
+                status="active",
+            ).values_list("coordinator_profile_id", flat=True)
+
+            self.fields["support_person"].queryset = SupportCoordinatorProfile.objects.filter(
+                id__in=active_coordinator_ids
+            ).select_related("user_profile")
+            self.fields["support_person"].label_from_instance = (
+                lambda obj: obj.user_profile.display_name
+            )
+
+            # Active matches as FK link
+            self.fields["match"].queryset = active_matches
+            self.fields["match"].label_from_instance = (
+                lambda obj: f"Match with {obj.caregiver.user_profile.display_name}"
+            )
+        else:
+            from .models import CaregiverProfile, SupportCoordinatorProfile
+            self.fields["caregiver"].queryset = CaregiverProfile.objects.none()
+            self.fields["support_person"].queryset = SupportCoordinatorProfile.objects.none()
+            self.fields["match"].queryset = __import__(
+                "matching.models", fromlist=["Match"]
+            ).Match.objects.none()
+
+        apply_bulma_classes(self)
+
+
+class ScheduleEntryForm(forms.Form):
+    """
+    Form for a single day/time entry in a schedule.
+    Used inside a formset.
+    """
+    from registry.models import DAY_OF_WEEK_CHOICES  # imported at class scope for choices
+
+    day_of_week = forms.ChoiceField(
+        choices=[("", "— Select day —")] + [
+            ("monday", "Monday"), ("tuesday", "Tuesday"),
+            ("wednesday", "Wednesday"), ("thursday", "Thursday"),
+            ("friday", "Friday"), ("saturday", "Saturday"), ("sunday", "Sunday"),
+        ],
+        label="Day",
+    )
+    start_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={"type": "time"}),
+        label="Start Time",
+    )
+    end_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={"type": "time"}),
+        label="End Time",
+    )
+    DELETE = forms.BooleanField(required=False, label="Remove this entry")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start = cleaned_data.get("start_time")
+        end = cleaned_data.get("end_time")
+        if start and end and end <= start:
+            raise forms.ValidationError("End time must be after start time.")
+        return cleaned_data
+
+
+class ScheduleEntryReviewForm(forms.Form):
+    """
+    Minimal form for a caregiver or support person to add a rejection note.
+    The action (approve/reject) is determined by the URL, not this form.
+    """
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 2}),
+        required=False,
+        label="Optional note or reason",
+        help_text="You may leave a short note explaining your decision.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)

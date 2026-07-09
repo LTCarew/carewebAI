@@ -154,4 +154,46 @@ urlpatterns = [
         views.add_client_to_org,
         name="add_client_to_org"
     ),
+
+    # ── Scheduling URLs ───────────────────────────────────────────────────────
+    path(
+        "schedules/",
+        views.schedule_list,
+        name="schedule_list",
+    ),
+    path(
+        "schedules/create/",
+        views.schedule_create,
+        name="schedule_create",
+    ),
+    path(
+        "schedules/<int:pk>/",
+        views.schedule_detail,
+        name="schedule_detail",
+    ),
+    path(
+        "schedules/<int:pk>/edit/",
+        views.schedule_edit,
+        name="schedule_edit",
+    ),
+    path(
+        "schedules/<int:pk>/submit/",
+        views.schedule_submit,
+        name="schedule_submit",
+    ),
+    path(
+        "schedules/<int:pk>/cancel/",
+        views.schedule_cancel,
+        name="schedule_cancel",
+    ),
+    path(
+        "schedule-entries/<int:entry_pk>/caregiver/<str:action>/",
+        views.schedule_entry_caregiver_respond,
+        name="schedule_entry_caregiver_respond",
+    ),
+    path(
+        "schedule-entries/<int:entry_pk>/support/<str:action>/",
+        views.schedule_entry_support_respond,
+        name="schedule_entry_support_respond",
+    ),
 ]

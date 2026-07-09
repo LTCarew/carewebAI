@@ -329,133 +329,17 @@ def match_cancel(request, match_id):
 
 @login_required
 def ai_match_for_caregiver(request):
-    """
-    Caregiver requests AI-assisted suggestions for the best client matches.
-    Shows scored results with explanation.
-    """
-    organization = get_active_organization(request)
-    user_role = get_user_primary_role(request.user, organization)
-
-    if user_role != "caregiver":
-        messages.error(request, "Only careworkers can use this feature.")
-        return redirect("dashboard_redirect")
-
-    try:
-        caregiver_profile = request.user.profile.caregiver_profile
-    except Exception:
-        messages.error(request, "Could not find your careworker profile.")
-        return redirect("caregiver_dashboard")
-
-    tag_ids = request.GET.getlist("tag_ids")
-    all_tags = Tag.objects.filter(is_active=True)
-
-    all_results = find_best_clients_for_caregiver(
-        caregiver=caregiver_profile,
-        organization=organization,
-        limit=200,
-        tag_ids=tag_ids or None,
-    )
-
-    results_page = Paginator(all_results, 10).get_page(request.GET.get("ai_page", 1))
-
-    return render(request, "matching/ai_match_caregiver.html", {
-        "results": results_page,
-        "all_tags": all_tags,
-        "selected_tag_ids": [int(t) for t in tag_ids],
-        "caregiver_profile": caregiver_profile,
-    })
+    """Redirect to Network Registry where AI matching now lives."""
+    return redirect("registry_network")
 
 
 @login_required
 def ai_match_for_client(request):
-    """
-    Client requests AI-assisted suggestions for the best caregiver matches.
-    Shows scored results with explanation.
-    """
-    organization = get_active_organization(request)
-    user_role = get_user_primary_role(request.user, organization)
-
-    if user_role != "client":
-        messages.error(request, "Only clients can use this feature.")
-        return redirect("dashboard_redirect")
-
-    try:
-        client_profile = request.user.profile.client_profile
-    except Exception:
-        messages.error(request, "Could not find your profile.")
-        return redirect("client_dashboard")
-
-    tag_ids = request.GET.getlist("tag_ids")
-    all_tags = Tag.objects.filter(is_active=True)
-
-    all_results = find_best_caregivers_for_client(
-        client=client_profile,
-        organization=organization,
-        limit=200,
-        tag_ids=tag_ids or None,
-    )
-
-    results_page = Paginator(all_results, 10).get_page(request.GET.get("ai_page", 1))
-
-    return render(request, "matching/ai_match_client.html", {
-        "results": results_page,
-        "all_tags": all_tags,
-        "selected_tag_ids": [int(t) for t in tag_ids],
-        "client_profile": client_profile,
-    })
+    """Redirect to Network Registry where AI matching now lives."""
+    return redirect("registry_network")
 
 
 @login_required
 def ai_match_for_staff(request):
-    """
-    Staff requests AI-assisted match suggestions.
-    Can optionally pre-select a caregiver, client, or tags.
-    """
-    from registry.models import CaregiverProfile, ClientProfile
-    from registry.services import user_is_admin_or_staff
-
-    if not user_is_admin_or_staff(request.user):
-        messages.error(request, "Only staff can use this feature.")
-        return redirect("dashboard_redirect")
-
-    organization = get_active_organization(request)
-    tag_ids = request.GET.getlist("tag_ids")
-    caregiver_id = request.GET.get("caregiver_id")
-    client_id = request.GET.get("client_id")
-    all_tags = Tag.objects.filter(is_active=True)
-
-    caregiver = None
-    client = None
-    if caregiver_id:
-        caregiver = get_object_or_404(CaregiverProfile, pk=caregiver_id)
-    if client_id:
-        client = get_object_or_404(ClientProfile, pk=client_id)
-
-    all_results = find_best_pair_for_staff(
-        organization=organization,
-        limit=200,
-        tag_ids=tag_ids or None,
-        caregiver=caregiver,
-        client=client,
-    )
-
-    results_page = Paginator(all_results, 10).get_page(request.GET.get("ai_page", 1))
-
-    # Get org members for selection dropdowns
-    from registry.models import OrganizationCaregiver, OrganizationClient
-    org_caregivers = OrganizationCaregiver.objects.filter(
-        organization=organization, status="approved"
-    ).select_related("caregiver_profile__user_profile")
-    org_clients = OrganizationClient.objects.filter(
-        organization=organization, status="approved"
-    ).select_related("client_profile__user_profile")
-
-    return render(request, "matching/ai_match_staff.html", {
-        "results": results_page,
-        "all_tags": all_tags,
-        "selected_tag_ids": [int(t) for t in tag_ids],
-        "org_caregivers": org_caregivers,
-        "org_clients": org_clients,
-        "selected_caregiver": caregiver,
-        "selected_client": client,
-    })
+    """Redirect to Network Registry where AI matching now lives."""
+    return redirect("registry_network")

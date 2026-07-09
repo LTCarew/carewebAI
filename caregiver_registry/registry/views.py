@@ -55,10 +55,25 @@ def coordinator_dashboard(request):
     
     # Get all clients this coordinator supports
     client_relationships = get_coordinator_clients(coordinator_profile)
-    
+
+    # Schedule entries pending this coordinator's approval
+    from .models import ScheduleEntry
+    pending_schedule_entries = list(
+        ScheduleEntry.objects.filter(
+            schedule__support_person=coordinator_profile,
+            support_person_status="pending",
+        ).exclude(
+            schedule__status__in=["draft", "cancelled"]
+        ).select_related(
+            "schedule__client__user_profile",
+            "schedule__caregiver__user_profile",
+        ).order_by("schedule__submitted_at", "day_of_week", "start_time")
+    )
+
     return render(request, "registry/coordinator_dashboard.html", {
         "coordinator_profile": coordinator_profile,
         "client_relationships": client_relationships,
+        "pending_schedule_entries": pending_schedule_entries,
     })
 
 
@@ -336,6 +351,20 @@ def caregiver_dashboard(request):
     # Unread notifications
     unread_notifications = request.user.profile.notifications.filter(is_read=False).order_by("-created_at")[:5]
 
+    # Scheduling: entries pending caregiver approval
+    from .models import ScheduleEntry
+    pending_schedule_entries = list(
+        ScheduleEntry.objects.filter(
+            schedule__caregiver=caregiver_profile,
+            caregiver_status="pending",
+        ).exclude(
+            schedule__status__in=["draft", "cancelled"]
+        ).select_related(
+            "schedule__client__user_profile",
+            "schedule__caregiver__user_profile",
+        ).order_by("schedule__submitted_at", "day_of_week", "start_time")
+    )
+
     return render(request, "registry/caregiver_dashboard.html", {
         "caregiver_profile": caregiver_profile,
         "pending_my_approval": pending_my_approval,
@@ -343,6 +372,7 @@ def caregiver_dashboard(request):
         "active_matches": active_matches,
         "declined_matches": declined_matches,
         "unread_notifications": unread_notifications,
+        "pending_schedule_entries": pending_schedule_entries,
     })
 
 
@@ -397,6 +427,16 @@ def client_dashboard(request):
     coordinators_qs = get_client_coordinators(client_profile)
     coordinators = Paginator(coordinators_qs, 10).get_page(request.GET.get("coordinators_page", 1))
 
+    # Scheduling: client's schedules
+    from .models import Schedule
+    my_schedules_qs = Schedule.objects.filter(
+        client=client_profile,
+    ).select_related(
+        "caregiver__user_profile",
+        "support_person__user_profile",
+    ).prefetch_related("entries").order_by("-created_at")
+    my_schedules = Paginator(my_schedules_qs, 10).get_page(request.GET.get("schedules_page", 1))
+
     return render(request, "registry/client_dashboard.html", {
         "client_profile": client_profile,
         "pending_my_approval": pending_my_approval,
@@ -405,6 +445,7 @@ def client_dashboard(request):
         "declined_matches": declined_matches,
         "unread_notifications": unread_notifications,
         "coordinators": coordinators,
+        "my_schedules": my_schedules,
     })
 
 
@@ -442,6 +483,7 @@ def registry_network(request):
 
     all_tags = Tag.objects.filter(is_active=True)
     tag_ids = request.GET.getlist("tag_ids")
+    ai_mode = request.GET.get("ai") == "1"  # True when user clicked "✨ AI Match"
     match_results = None       # Only populated after the user submits criteria
     match_direction = None     # "find_clients" or "find_caregivers"
 
@@ -467,7 +509,7 @@ def registry_network(request):
 
         match_direction = "find_clients"
 
-        if tag_ids:
+        if tag_ids or ai_mode:
             # Score all eligible clients against this caregiver in their orgs
             from matching.services import find_best_clients_for_caregiver as _find
             raw_results = []
@@ -478,7 +520,7 @@ def registry_network(request):
                     org_obj = Organization.objects.get(pk=org_id)
                 except Organization.DoesNotExist:
                     continue
-                for r in _find(caregiver_profile, org_obj, limit=200, tag_ids=tag_ids):
+                for r in _find(caregiver_profile, org_obj, limit=200, tag_ids=tag_ids or None):
                     if r["client"].pk not in seen_client_ids:
                         seen_client_ids.add(r["client"].pk)
                         raw_results.append(r)
@@ -512,7 +554,7 @@ def registry_network(request):
 
         match_direction = "find_caregivers"
 
-        if tag_ids:
+        if tag_ids or ai_mode:
             from matching.services import find_best_caregivers_for_client as _find
             raw_results = []
             seen_cg_ids = set()
@@ -576,9 +618,9 @@ def registry_network(request):
                 except CaregiverProfile.DoesNotExist:
                     pass
 
-            if selected_caregiver and tag_ids:
+            if selected_caregiver and (tag_ids or ai_mode):
                 raw_results = find_best_clients_for_caregiver(
-                    selected_caregiver, organization, limit=200, tag_ids=tag_ids
+                    selected_caregiver, organization, limit=200, tag_ids=tag_ids or None
                 )
                 match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
 
@@ -590,9 +632,9 @@ def registry_network(request):
                 except ClientProfile.DoesNotExist:
                     pass
 
-            if selected_client and tag_ids:
+            if selected_client and (tag_ids or ai_mode):
                 raw_results = find_best_caregivers_for_client(
-                    selected_client, organization, limit=200, tag_ids=tag_ids
+                    selected_client, organization, limit=200, tag_ids=tag_ids or None
                 )
                 match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
 
@@ -633,7 +675,7 @@ def org_dashboard(request):
     
     # Get user's role in this organization
     user_role = get_user_primary_role(request.user, active_org) if active_org else None
-    role_display = user_role.title() if user_role else "Staff"
+    role_display = "Staff Admin" if user_role in ("admin", "staff") else (user_role.title() if user_role else "Staff Admin")
     
     # Get ALL caregiver and client profiles
     all_caregivers = CaregiverProfile.objects.select_related('user_profile').all()
@@ -732,6 +774,17 @@ def org_dashboard(request):
     caregivers_page = Paginator(caregiver_data, 10).get_page(request.GET.get("caregivers_page", 1))
     clients_page = Paginator(client_data, 10).get_page(request.GET.get("clients_page", 1))
 
+    # Scheduling oversight
+    from .models import Schedule
+    all_schedules_qs = Schedule.objects.filter(
+        organization=active_org,
+    ).select_related(
+        "client__user_profile",
+        "caregiver__user_profile",
+        "support_person__user_profile",
+    ).prefetch_related("entries").order_by("-created_at") if active_org else Schedule.objects.none()
+    all_schedules = Paginator(all_schedules_qs, 10).get_page(request.GET.get("schedules_page", 1))
+
     return render(request, "registry/org_dashboard.html", {
         "caregivers": caregivers_page,
         "clients": clients_page,
@@ -749,6 +802,8 @@ def org_dashboard(request):
         "pending_client_matches": pending_client_matches,
         "active_matches": active_matches,
         "declined_matches": declined_matches,
+        # Schedule oversight
+        "all_schedules": all_schedules,
     })
 
 
@@ -1225,3 +1280,414 @@ def add_client_to_org(request, profile_id):
         messages.info(request, f"{client_profile.user_profile.display_name} is already in your organization.")
     
     return redirect("org_dashboard")
+
+
+# ==============================================
+# Scheduling Views
+# ==============================================
+
+@login_required
+def schedule_list(request):
+    """
+    Redirect to the role-appropriate dashboard which now shows schedules.
+    """
+    return redirect("dashboard_redirect")
+
+
+@login_required
+def schedule_create(request):
+    """
+    Client creates a new draft schedule.
+    Only clients may create schedules.
+    """
+    from .models import ClientProfile, Schedule, ScheduleEntry
+    from .forms import ScheduleForm, ScheduleEntryForm
+    from django.forms import formset_factory
+
+    try:
+        client_profile = request.user.profile.client_profile
+    except Exception:
+        messages.error(request, "Only clients can create schedules.")
+        return redirect("dashboard_redirect")
+
+    organization = get_active_organization(request)
+    if not organization:
+        messages.error(request, "No active organization found.")
+        return redirect("dashboard_redirect")
+
+    EntryFormSet = formset_factory(ScheduleEntryForm, extra=1, can_delete=False)
+
+    if request.method == "POST":
+        form = ScheduleForm(request.POST, client_profile=client_profile)
+        formset = EntryFormSet(request.POST, prefix="entries")
+
+        if form.is_valid() and formset.is_valid():
+            # Validate at least one entry
+            valid_entries = [
+                f for f in formset
+                if f.cleaned_data and not f.cleaned_data.get("DELETE")
+            ]
+            if not valid_entries:
+                messages.error(request, "Please add at least one day/time entry.")
+            else:
+                schedule = Schedule.objects.create(
+                    organization=organization,
+                    client=client_profile,
+                    caregiver=form.cleaned_data["caregiver"],
+                    support_person=form.cleaned_data.get("support_person"),
+                    match=form.cleaned_data.get("match"),
+                    created_by=request.user.profile,
+                    status="draft",
+                    notes=form.cleaned_data.get("notes", ""),
+                )
+                for entry_form in valid_entries:
+                    ScheduleEntry.objects.create(
+                        schedule=schedule,
+                        day_of_week=entry_form.cleaned_data["day_of_week"],
+                        start_time=entry_form.cleaned_data["start_time"],
+                        end_time=entry_form.cleaned_data["end_time"],
+                    )
+                messages.success(request, "Draft schedule created. You can edit and submit it when ready.")
+                return redirect("schedule_detail", pk=schedule.pk)
+    else:
+        form = ScheduleForm(client_profile=client_profile)
+        formset = EntryFormSet(prefix="entries")
+
+    return render(request, "registry/schedule_form.html", {
+        "form": form,
+        "formset": formset,
+        "action": "create",
+        "page_title": "Create Schedule",
+    })
+
+
+@login_required
+def schedule_detail(request, pk):
+    """
+    View a schedule. Accessible to the involved client, caregiver,
+    support person, and staff/admin.
+    """
+    from .models import Schedule
+
+    schedule = get_object_or_404(
+        Schedule.objects.select_related(
+            "client__user_profile",
+            "caregiver__user_profile",
+            "support_person__user_profile",
+            "organization",
+            "created_by",
+        ).prefetch_related("entries"),
+        pk=pk,
+    )
+
+    user_profile = request.user.profile
+    is_client = (
+        hasattr(user_profile, "client_profile")
+        and user_profile.client_profile == schedule.client
+    )
+    is_caregiver = (
+        hasattr(user_profile, "caregiver_profile")
+        and user_profile.caregiver_profile == schedule.caregiver
+    )
+    is_support = (
+        schedule.support_person is not None
+        and hasattr(user_profile, "support_coordinator_profile")
+        and user_profile.support_coordinator_profile == schedule.support_person
+    )
+    is_staff = _is_admin_or_staff(request)
+
+    if not (is_client or is_caregiver or is_support or is_staff):
+        messages.error(request, "You do not have permission to view this schedule.")
+        return redirect("dashboard_redirect")
+
+    return render(request, "registry/schedule_detail.html", {
+        "schedule": schedule,
+        "entries": schedule.entries.all(),
+        "is_client": is_client,
+        "is_caregiver": is_caregiver,
+        "is_support": is_support,
+        "is_staff": is_staff,
+    })
+
+
+@login_required
+def schedule_edit(request, pk):
+    """
+    Client edits a DRAFT schedule.
+    Blocked after submission.
+    """
+    from .models import Schedule, ScheduleEntry, ClientProfile
+    from .forms import ScheduleForm, ScheduleEntryForm
+    from django.forms import formset_factory
+
+    schedule = get_object_or_404(Schedule, pk=pk)
+
+    # Permission check
+    try:
+        client_profile = request.user.profile.client_profile
+    except Exception:
+        messages.error(request, "Only clients can edit schedules.")
+        return redirect("dashboard_redirect")
+
+    if schedule.client != client_profile:
+        messages.error(request, "You can only edit your own schedules.")
+        return redirect("dashboard_redirect")
+
+    if not schedule.is_editable_by_client:
+        messages.warning(
+            request,
+            "Submitted schedules cannot be edited. "
+            "To make changes, cancel this schedule and create a new one."
+        )
+        return redirect("schedule_detail", pk=pk)
+
+    organization = get_active_organization(request)
+    EntryFormSet = formset_factory(ScheduleEntryForm, extra=1, can_delete=True)
+
+    existing_entries = list(schedule.entries.all())
+
+    if request.method == "POST":
+        form = ScheduleForm(request.POST, client_profile=client_profile)
+        formset = EntryFormSet(request.POST, prefix="entries")
+
+        if form.is_valid() and formset.is_valid():
+            valid_entries = [
+                f for f in formset
+                if f.cleaned_data and not f.cleaned_data.get("DELETE")
+            ]
+            if not valid_entries:
+                messages.error(request, "Please keep at least one day/time entry.")
+            else:
+                schedule.caregiver = form.cleaned_data["caregiver"]
+                schedule.support_person = form.cleaned_data.get("support_person")
+                schedule.match = form.cleaned_data.get("match")
+                schedule.notes = form.cleaned_data.get("notes", "")
+                schedule.save()
+
+                # Replace all entries
+                schedule.entries.all().delete()
+                for entry_form in valid_entries:
+                    ScheduleEntry.objects.create(
+                        schedule=schedule,
+                        day_of_week=entry_form.cleaned_data["day_of_week"],
+                        start_time=entry_form.cleaned_data["start_time"],
+                        end_time=entry_form.cleaned_data["end_time"],
+                    )
+                messages.success(request, "Schedule updated.")
+                return redirect("schedule_detail", pk=pk)
+    else:
+        initial_form = {
+            "caregiver": schedule.caregiver,
+            "support_person": schedule.support_person,
+            "match": schedule.match,
+            "notes": schedule.notes,
+        }
+        form = ScheduleForm(initial=initial_form, client_profile=client_profile)
+        initial_entries = [
+            {
+                "day_of_week": e.day_of_week,
+                "start_time": e.start_time,
+                "end_time": e.end_time,
+            }
+            for e in existing_entries
+        ]
+        formset = EntryFormSet(initial=initial_entries, prefix="entries")
+
+    return render(request, "registry/schedule_form.html", {
+        "form": form,
+        "formset": formset,
+        "action": "edit",
+        "schedule": schedule,
+        "page_title": "Edit Schedule",
+    })
+
+
+@login_required
+def schedule_submit(request, pk):
+    """
+    Client submits a draft schedule to the caregiver/support person.
+    POST only. Locked after submission.
+    """
+    from .models import Schedule
+    from django.utils import timezone as tz
+
+    schedule = get_object_or_404(Schedule, pk=pk)
+
+    try:
+        client_profile = request.user.profile.client_profile
+    except Exception:
+        messages.error(request, "Only clients can submit schedules.")
+        return redirect("dashboard_redirect")
+
+    if schedule.client != client_profile:
+        messages.error(request, "You can only submit your own schedules.")
+        return redirect("dashboard_redirect")
+
+    if schedule.status != "draft":
+        messages.warning(request, "This schedule has already been submitted.")
+        return redirect("schedule_detail", pk=pk)
+
+    if not schedule.entries.exists():
+        messages.error(request, "Cannot submit a schedule with no entries.")
+        return redirect("schedule_detail", pk=pk)
+
+    if request.method == "POST":
+        schedule.status = "submitted"
+        schedule.submitted_at = tz.now()
+        schedule.save()
+        messages.success(request, "Schedule submitted. The careworker and support person will review it.")
+        return redirect("schedule_detail", pk=pk)
+
+    return redirect("schedule_detail", pk=pk)
+
+
+@login_required
+def schedule_cancel(request, pk):
+    """
+    Client soft-cancels a submitted schedule.
+    POST only.
+    """
+    from .models import Schedule
+    from django.utils import timezone as tz
+
+    schedule = get_object_or_404(Schedule, pk=pk)
+
+    try:
+        client_profile = request.user.profile.client_profile
+    except Exception:
+        messages.error(request, "Only clients can cancel schedules.")
+        return redirect("dashboard_redirect")
+
+    if schedule.client != client_profile:
+        messages.error(request, "You can only cancel your own schedules.")
+        return redirect("dashboard_redirect")
+
+    if schedule.status == "cancelled":
+        messages.info(request, "This schedule is already cancelled.")
+        return redirect("schedule_detail", pk=pk)
+
+    if schedule.status == "approved":
+        messages.error(request, "An approved schedule cannot be cancelled.")
+        return redirect("schedule_detail", pk=pk)
+
+    if request.method == "POST":
+        schedule.status = "cancelled"
+        schedule.cancelled_at = tz.now()
+        schedule.save()
+        messages.success(request, "Schedule cancelled. You may create a new schedule.")
+        return redirect("client_dashboard")
+
+    return redirect("schedule_detail", pk=pk)
+
+
+@login_required
+def schedule_entry_caregiver_respond(request, entry_pk, action):
+    """
+    Caregiver approves or rejects a single schedule entry.
+    action: 'approve' | 'reject'
+    POST only.
+    """
+    from .models import ScheduleEntry
+    from .forms import ScheduleEntryReviewForm
+    from django.utils import timezone as tz
+
+    entry = get_object_or_404(
+        ScheduleEntry.objects.select_related("schedule__caregiver__user_profile"),
+        pk=entry_pk,
+    )
+
+    try:
+        caregiver_profile = request.user.profile.caregiver_profile
+    except Exception:
+        messages.error(request, "Only careworkers can respond to schedule entries.")
+        return redirect("dashboard_redirect")
+
+    if entry.schedule.caregiver != caregiver_profile:
+        messages.error(request, "You can only respond to schedules assigned to you.")
+        return redirect("dashboard_redirect")
+
+    if entry.schedule.status in ("draft", "cancelled"):
+        messages.error(request, "Cannot respond to a draft or cancelled schedule.")
+        return redirect("schedule_detail", pk=entry.schedule.pk)
+
+    if request.method == "POST":
+        form = ScheduleEntryReviewForm(request.POST)
+        if form.is_valid():
+            if action == "approve":
+                entry.caregiver_status = "approved"
+            elif action == "reject":
+                entry.caregiver_status = "rejected"
+                entry.caregiver_notes = form.cleaned_data.get("notes", "")
+            else:
+                messages.error(request, "Invalid action.")
+                return redirect("schedule_detail", pk=entry.schedule.pk)
+
+            entry.caregiver_reviewed_at = tz.now()
+            entry.save()
+            entry.schedule.update_status_from_entries()
+            messages.success(request, f"Entry {action}d.")
+        return redirect("schedule_detail", pk=entry.schedule.pk)
+
+    return redirect("schedule_detail", pk=entry.schedule.pk)
+
+
+@login_required
+def schedule_entry_support_respond(request, entry_pk, action):
+    """
+    Support person/coordinator approves or rejects a single schedule entry.
+    action: 'approve' | 'reject'
+    POST only.
+    """
+    from .models import ScheduleEntry
+    from .forms import ScheduleEntryReviewForm
+    from django.utils import timezone as tz
+
+    entry = get_object_or_404(
+        ScheduleEntry.objects.select_related("schedule__support_person__user_profile"),
+        pk=entry_pk,
+    )
+
+    try:
+        coordinator_profile = request.user.profile.support_coordinator_profile
+    except Exception:
+        messages.error(request, "Only support persons can respond to schedule entries.")
+        return redirect("dashboard_redirect")
+
+    if entry.schedule.support_person != coordinator_profile:
+        messages.error(request, "You can only respond to schedules assigned to you.")
+        return redirect("dashboard_redirect")
+
+    if entry.schedule.status in ("draft", "cancelled"):
+        messages.error(request, "Cannot respond to a draft or cancelled schedule.")
+        return redirect("schedule_detail", pk=entry.schedule.pk)
+
+    if request.method == "POST":
+        form = ScheduleEntryReviewForm(request.POST)
+        if form.is_valid():
+            if action == "approve":
+                entry.support_person_status = "approved"
+            elif action == "reject":
+                entry.support_person_status = "rejected"
+                entry.support_person_notes = form.cleaned_data.get("notes", "")
+            else:
+                messages.error(request, "Invalid action.")
+                return redirect("schedule_detail", pk=entry.schedule.pk)
+
+            entry.support_person_reviewed_at = tz.now()
+            entry.save()
+            entry.schedule.update_status_from_entries()
+            messages.success(request, f"Entry {action}d.")
+        return redirect("schedule_detail", pk=entry.schedule.pk)
+
+    return redirect("schedule_detail", pk=entry.schedule.pk)
+
+
+# ── Internal helper used by schedule views ───────────────────────────────────
+
+def _is_admin_or_staff(request):
+    """Return True if the current user has admin or staff role in any org."""
+    from organizations.models import OrganizationStaff
+    return OrganizationStaff.objects.filter(
+        staff_profile__user_profile=request.user.profile,
+        status="active",
+    ).exists()

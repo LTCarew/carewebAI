@@ -1,7 +1,7 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" class="theme-light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,6 +15,15 @@
 </head>
 
 <body class="app-body">
+
+<!-- AI Matching Loading Overlay — hidden by default, shown only on AI match trigger -->
+<div id="ai-loading-overlay" class="ai-loading-overlay" hidden role="status" aria-live="polite">
+  <div class="ai-loading-modal">
+    <div class="ai-spinner" aria-hidden="true"></div>
+    <p class="ai-loading-label">Running AI Match…</p>
+  </div>
+</div>
+
 {% include 'navbar.html' %}
 
 <section class="hero app-hero">
@@ -69,6 +78,32 @@
         });
     });
 </script>
+
+<script>
+(function () {
+  function showAiOverlay() {
+    var overlay = document.getElementById('ai-loading-overlay');
+    if (!overlay) return;
+    overlay.removeAttribute('hidden');  // remove HTML hidden attr
+    overlay.classList.add('is-active'); // trigger CSS flex display
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // Fire spinner when any form is submitted via the "✨ AI Match" button
+    // (buttons with name="ai" value="1" inside any form on the page)
+    document.querySelectorAll('form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        var submitter = e.submitter;
+        if (submitter && submitter.name === 'ai' && submitter.value === '1') {
+          showAiOverlay();
+        }
+      });
+    });
+  });
+})();
+</script>
+
+{% block extra_js %}{% endblock %}
 
 </body>
 </html>

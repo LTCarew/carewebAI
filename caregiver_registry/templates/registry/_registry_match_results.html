@@ -1,0 +1,184 @@
+{% comment %}
+Reusable match results partial for Network Registry page.
+
+Required context:
+  results         — Page object from Paginator.get_page()
+  role            — 'caregiver', 'client', or 'staff' / 'admin'
+  match_direction — 'find_clients' (results are clients) or
+                    'find_caregivers' (results are caregivers)
+
+Optional context (staff only):
+  selected_caregiver — CaregiverProfile if staff picked one
+  selected_client    — ClientProfile if staff picked one
+  selected_tag_ids   — list of int tag PKs already selected
+{% endcomment %}
+
+<div class="card app-card">
+  <div class="card-content">
+
+    {# ── Section heading ── #}
+    {% if match_direction == "find_clients" %}
+    <h2 class="title is-5">✨ AI Matching — Clients</h2>
+    {% else %}
+    <h2 class="title is-5">✨ AI Matching — Careworkers</h2>
+    {% endif %}
+
+    {# ── Score key ── #}
+    <div class="notification is-light mb-4 p-4" style="border-left: 4px solid #7e6b8f;">
+      <p class="has-text-weight-bold mb-2 is-size-6">📊 How to read the compatibility score</p>
+      <p class="is-size-7 mb-1">
+        Scores are calculated out of <strong>100</strong> based on matching care tags, schedule availability,
+        location, and other profile criteria. AI reasoning is provided to explain the top factors.
+      </p>
+      <div class="columns is-mobile is-vcentered mt-2">
+        <div class="column is-narrow">
+          <span class="tag is-success is-medium" style="font-weight:700; min-width:3.5rem;">70–100</span>
+        </div>
+        <div class="column">
+          <span class="has-text-weight-semibold">Strong match</span>
+          <span class="has-text-grey is-size-7"> — High compatibility. Good candidate to request or propose a match.</span>
+        </div>
+      </div>
+      <div class="columns is-mobile is-vcentered">
+        <div class="column is-narrow">
+          <span class="tag is-warning is-medium" style="font-weight:700; min-width:3.5rem; color:#1a1a1a;">40–69</span>
+        </div>
+        <div class="column">
+          <span class="has-text-weight-semibold">Possible match</span>
+          <span class="has-text-grey is-size-7"> — Some compatibility. Review the AI reasoning and tags before deciding.</span>
+        </div>
+      </div>
+      <div class="columns is-mobile is-vcentered">
+        <div class="column is-narrow">
+          <span class="tag is-danger is-light is-medium" style="font-weight:700; min-width:3.5rem;">0–39</span>
+        </div>
+        <div class="column">
+          <span class="has-text-weight-semibold">Low match</span>
+          <span class="has-text-grey is-size-7"> — Limited compatibility. Likely needs significant review before proposing.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-container" role="region" aria-label="Match Results">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Score</th>
+            <th scope="col">Matched Tags</th>
+            <th scope="col">AI Reasoning</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in results %}
+          <tr>
+            {# ── Person name column ── #}
+            <td>
+              {% if match_direction == "find_clients" %}
+                {# Showing clients — staff always links; caregiver links to the client they found #}
+                {% if role == "staff" or role == "admin" or role == "caregiver" %}
+                  <a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.display_name }}</a>
+                {% else %}
+                  {{ result.client.user_profile.display_name }}
+                {% endif %}
+                <br>
+                <span class="is-size-7 has-text-grey">{{ result.client.user_profile.city|default:"" }}</span>
+              {% else %}
+                {# Showing caregivers — staff always links; client links to the caregiver they found #}
+                {% if role == "staff" or role == "admin" or role == "client" %}
+                  <a href="{% url 'caregiver_detail' result.caregiver.pk %}">{{ result.caregiver.user_profile.display_name }}</a>
+                {% else %}
+                  {{ result.caregiver.user_profile.display_name }}
+                {% endif %}
+                <br>
+                <span class="is-size-7 has-text-grey">{{ result.caregiver.user_profile.city|default:"" }}</span>
+              {% endif %}
+            </td>
+
+            {# ── Compatibility score + plain-language label ── #}
+            <td style="white-space:nowrap;">
+              {% if result.score >= 70 %}
+                <span class="tag is-success" style="font-weight:700;">{{ result.score }}</span>
+                <br><span class="is-size-7 has-text-grey">Strong</span>
+              {% elif result.score >= 40 %}
+                <span class="tag is-warning" style="font-weight:700; color:#1a1a1a;">{{ result.score }}</span>
+                <br><span class="is-size-7 has-text-grey">Possible</span>
+              {% else %}
+                <span class="tag is-danger is-light" style="font-weight:700;">{{ result.score }}</span>
+                <br><span class="is-size-7 has-text-grey">Low</span>
+              {% endif %}
+            </td>
+
+            {# ── Criteria matches (selected tags that hit the profile) ── #}
+            <td>
+              {% if result.criteria_matches %}
+                {% for key in result.criteria_matches %}
+                  <span class="tag is-info is-light is-small">#{{ key }}</span>
+                {% endfor %}
+              {% elif result.details.tag_overlap.overlapping %}
+                {% for tag_name in result.details.tag_overlap.overlapping %}
+                  <span class="tag is-light is-small">#{{ tag_name }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="has-text-grey-light is-size-7">—</span>
+              {% endif %}
+            </td>
+
+            {# ── AI Reasoning ── #}
+            <td class="is-size-7">{{ result.ai_reasoning }}</td>
+
+            {# ── Action column ── #}
+            <td>
+              {# Caregiver requesting a match with a client #}
+              {% if role == "caregiver" and match_direction == "find_clients" %}
+              <form method="post" action="{% url 'caregiver_request_match' result.client.pk %}">
+                {% csrf_token %}
+                {% for tid in selected_tag_ids %}
+                  <input type="hidden" name="tag_ids" value="{{ tid }}">
+                {% endfor %}
+                <button type="submit" class="button is-primary is-small">Request Match</button>
+              </form>
+
+              {# Client requesting a match with a caregiver #}
+              {% elif role == "client" and match_direction == "find_caregivers" %}
+              <form method="post" action="{% url 'client_request_match' result.caregiver.pk %}">
+                {% csrf_token %}
+                {% for tid in selected_tag_ids %}
+                  <input type="hidden" name="tag_ids" value="{{ tid }}">
+                {% endfor %}
+                <button type="submit" class="button is-primary is-small">Request Match</button>
+              </form>
+
+              {# Staff proposing a match #}
+              {% elif role == "staff" or role == "admin" %}
+              <form method="post" action="{% url 'staff_create_match' %}">
+                {% csrf_token %}
+                {% if match_direction == "find_clients" %}
+                  <input type="hidden" name="caregiver_id" value="{{ selected_caregiver.pk }}">
+                  <input type="hidden" name="client_id" value="{{ result.client.pk }}">
+                {% else %}
+                  <input type="hidden" name="caregiver_id" value="{{ result.caregiver.pk }}">
+                  <input type="hidden" name="client_id" value="{{ selected_client.pk }}">
+                {% endif %}
+                {% for tid in selected_tag_ids %}
+                  <input type="hidden" name="tag_ids" value="{{ tid }}">
+                {% endfor %}
+                <button type="submit" class="button is-primary is-small">Propose Match</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="has-text-grey-light is-italic">No matches found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "includes/_pagination.html" with page_obj=results page_param="page" %}
+
+  </div>
+</div>

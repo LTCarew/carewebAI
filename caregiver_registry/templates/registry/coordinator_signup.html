@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Accept Support Person Invitation{% endblock %}
+
+{% block content %}
+<div class="columns is-centered">
+  <div class="column is-10-tablet is-8-desktop">
+
+    <div class="mb-5">
+      <h1 class="title is-3">Accept Support Person Invitation</h1>
+      {% if invite %}
+        <p class="subtitle is-6">
+          You have been invited to become a support person
+          {% if invite.client_profile %}
+            for <strong>{{ invite.client_profile.user_profile.display_name }}</strong>
+          {% endif %}.
+          Complete your profile below to accept.
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="card app-card">
+      <div class="card-content">
+
+        {% if form.non_field_errors %}
+          <div class="notification is-danger is-light">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <!-- Email (read-only, pre-filled) -->
+          <div class="field">
+            <label class="label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+            <div class="control">{{ form.email }}</div>
+            {% if form.email.errors %}<div class="help is-danger" role="alert">{{ form.email.errors }}</div>{% endif %}
+            <p class="help">You will use this email to log in to your account.</p>
+          </div>
+
+          <h2 class="title is-5 mt-5 mb-3">Your Information</h2>
+
+          <!-- First Name -->
+          <div class="field">
+            <label class="label" for="{{ form.first_name.id_for_label }}">
+              {{ form.first_name.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.first_name }}</div>
+            {% if form.first_name.errors %}<div class="help is-danger" role="alert">{{ form.first_name.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Last Name -->
+          <div class="field">
+            <label class="label" for="{{ form.last_name.id_for_label }}">
+              {{ form.last_name.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.last_name }}</div>
+            {% if form.last_name.errors %}<div class="help is-danger" role="alert">{{ form.last_name.errors }}</div>{% endif %}
+          </div>
+
+          <h2 class="title is-5 mt-5 mb-3">Create Your Login Password</h2>
+
+          <!-- Password -->
+          <div class="field">
+            <label class="label" for="{{ form.password1.id_for_label }}">
+              {{ form.password1.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.password1 }}</div>
+            {% if form.password1.help_text %}<p class="help">{{ form.password1.help_text }}</p>{% endif %}
+            {% if form.password1.errors %}<div class="help is-danger" role="alert">{{ form.password1.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="field">
+            <label class="label" for="{{ form.password2.id_for_label }}">
+              {{ form.password2.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.password2 }}</div>
+            {% if form.password2.help_text %}<p class="help">{{ form.password2.help_text }}</p>{% endif %}
+            {% if form.password2.errors %}<div class="help is-danger" role="alert">{{ form.password2.errors }}</div>{% endif %}
+          </div>
+
+          <h2 class="title is-5 mt-5 mb-3">Contact Details</h2>
+
+          <!-- Phone -->
+          <div class="field">
+            <label class="label" for="{{ form.phone.id_for_label }}">
+              {{ form.phone.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.phone }}</div>
+            {% if form.phone.errors %}<div class="help is-danger" role="alert">{{ form.phone.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Contact Preferences -->
+          <div class="field">
+            <label class="label">
+              {{ form.contact_preferences.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control checkbox-group">{{ form.contact_preferences }}</div>
+            {% if form.contact_preferences.errors %}<div class="help is-danger" role="alert">{{ form.contact_preferences.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Pronouns -->
+          <div class="field">
+            <label class="label" for="{{ form.pronouns.id_for_label }}">{{ form.pronouns.label }}</label>
+            <div class="control">{{ form.pronouns }}</div>
+            {% if form.pronouns.errors %}<div class="help is-danger" role="alert">{{ form.pronouns.errors }}</div>{% endif %}
+          </div>
+
+          <h2 class="title is-5 mt-5 mb-3">Support Person Details</h2>
+
+          <!-- Relationship to client -->
+          <div class="field">
+            <label class="label" for="{{ form.relationship_to_clients.id_for_label }}">
+              {{ form.relationship_to_clients.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.relationship_to_clients }}</div>
+            {% if form.relationship_to_clients.help_text %}<p class="help">{{ form.relationship_to_clients.help_text }}</p>{% endif %}
+            {% if form.relationship_to_clients.errors %}<div class="help is-danger" role="alert">{{ form.relationship_to_clients.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Credentials -->
+          <div class="field">
+            <label class="label" for="{{ form.credentials.id_for_label }}">{{ form.credentials.label }}</label>
+            <div class="control">{{ form.credentials }}</div>
+            {% if form.credentials.help_text %}<p class="help">{{ form.credentials.help_text }}</p>{% endif %}
+            {% if form.credentials.errors %}<div class="help is-danger" role="alert">{{ form.credentials.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Certifications -->
+          <div class="field">
+            <label class="label" for="{{ form.certifications.id_for_label }}">{{ form.certifications.label }}</label>
+            <div class="control">{{ form.certifications }}</div>
+            {% if form.certifications.help_text %}<p class="help">{{ form.certifications.help_text }}</p>{% endif %}
+            {% if form.certifications.errors %}<div class="help is-danger" role="alert">{{ form.certifications.errors }}</div>{% endif %}
+          </div>
+
+          <div class="notification is-info is-light mt-5">
+            <strong>📌 After accepting:</strong> You'll be logged in automatically. To log in again in future,
+            go to the login page and use your email address and the password you just created above.
+          </div>
+
+          <div class="buttons mt-5">
+            <button type="submit" class="button is-link is-medium">Accept Invitation</button>
+            <a href="{% url 'home' %}" class="button is-light">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

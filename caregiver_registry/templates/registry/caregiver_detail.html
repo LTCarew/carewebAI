@@ -1,58 +1,25 @@
 {% extends "base.html" %}
 
 {% block title %}
-Caregiver Review
+Careworker Details
 {% endblock %}
 
 {% block content %}
 
-<!-- Admin review header and navigation actions -->
+<!-- Header -->
 <div class="level mb-4">
     <div class="level-left">
         <div>
-            <h1 class="title is-3">Caregiver Review</h1>
-            <p class="subtitle is-6 mb-0">Review profile details and update application status.</p>
+            <h1 class="title is-3">Careworker Details</h1>
+            <p class="subtitle is-6 mb-0">View profile details and experience.</p>
         </div>
     </div>
     <div class="level-right">
-        <a href="{% url 'admin_dashboard' %}" class="button is-light">Back to Dashboard</a>
-    </div>
-</div>
-
-<!-- Status chip + status workflow controls (POST-only) -->
-<div class="box mb-5">
-    <div class="level">
-        <div class="level-left">
-            <div>
-                <p class="heading">Current Status</p>
-                {% if caregiver.status == "approved" %}
-                    <span class="tag is-success is-medium">Approved</span>
-                {% elif caregiver.status == "rejected" %}
-                    <span class="tag is-danger is-medium">Rejected</span>
-                {% else %}
-                    <span class="tag is-warning is-medium">Pending</span>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="level-right">
-            <div class="buttons">
-                <form method="post" action="{% url 'update_caregiver_status' caregiver.pk 'approved' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="button is-success">Approve</button>
-                </form>
-
-                <form method="post" action="{% url 'update_caregiver_status' caregiver.pk 'rejected' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="button is-danger">Reject</button>
-                </form>
-
-                <form method="post" action="{% url 'update_caregiver_status' caregiver.pk 'pending' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="button is-warning is-light">Mark Pending</button>
-                </form>
-            </div>
-        </div>
+        {% if viewer_role == "client" %}
+          <a href="{% url 'client_dashboard' %}" class="button is-light">← Back to Dashboard</a>
+        {% else %}
+          <a href="{% url 'org_dashboard' %}" class="button is-light">← Back to Dashboard</a>
+        {% endif %}
     </div>
 </div>
 
@@ -62,12 +29,12 @@ Caregiver Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Identity & Contact</h2>
-                <p><strong>Name:</strong> {{ caregiver.name }}</p>
-                <p><strong>Email:</strong> {{ caregiver.email }}</p>
-                <p><strong>Phone:</strong> {{ caregiver.phone }}</p>
-                <p><strong>Pronouns:</strong> {{ caregiver.pronouns|default:"Not provided" }}</p>
-                <p><strong>Contact preferences:</strong> {{ caregiver.contact_preferences|join:", "|default:"None selected" }}</p>
-                <p><strong>Organization:</strong> {{ caregiver.organization.name }}</p>
+                <p><strong>Name:</strong> {{ org_caregiver.caregiver_profile.user_profile.display_name }}</p>
+                <p><strong>Email:</strong> {{ org_caregiver.caregiver_profile.user_profile.auth_email }}</p>
+                <p><strong>Phone:</strong> {{ org_caregiver.caregiver_profile.user_profile.phone }}</p>
+                <p><strong>Pronouns:</strong> {{ org_caregiver.caregiver_profile.user_profile.get_pronouns_display|default:"Not provided" }}</p>
+                <p><strong>Contact preferences:</strong> {{ org_caregiver.caregiver_profile.user_profile.contact_preferences|join:", "|default:"None selected" }}</p>
+                <p><strong>Organization:</strong> {{ org_caregiver.organization.name }}</p>
             </div>
         </div>
     </div>
@@ -77,11 +44,12 @@ Caregiver Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Location & Transportation</h2>
-                <p><strong>Base ZIP:</strong> {{ caregiver.base_zip_code }}</p>
-                <p><strong>Willing work cities:</strong> {{ caregiver.willing_to_work_cities|join:", "|default:"None selected" }}</p>
-                <p><strong>Transportation:</strong> {{ caregiver.transportation|join:", "|default:"None selected" }}</p>
-                <p><strong>Hours looking for:</strong> {{ caregiver.get_hours_looking_for_display }}</p>
-                <p><strong>Hourly rate:</strong> {{ caregiver.get_rate_display }}</p>
+                <p><strong>Base ZIP:</strong> {{ org_caregiver.caregiver_profile.base_zip_code }}</p>
+                <p><strong>Willing work cities:</strong> {{ org_caregiver.caregiver_profile.willing_to_work_cities|join:", "|default:"None selected" }}</p>
+                <p><strong>Transportation:</strong> {{ org_caregiver.caregiver_profile.transportation|join:", "|default:"None selected" }}</p>
+                <p><strong>Hours looking for:</strong> {{ org_caregiver.caregiver_profile.get_hours_looking_for_display }}</p>
+                <p><strong>Desired hours per week:</strong> {{ org_caregiver.caregiver_profile.desired_hours_per_week|default:"Not specified" }}</p>
+                <p><strong>Hourly rate:</strong> {{ org_caregiver.caregiver_profile.get_rate_display }}</p>
             </div>
         </div>
     </div>
@@ -91,10 +59,19 @@ Caregiver Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Availability</h2>
-                {% if caregiver.availability %}
+                {% if org_caregiver.caregiver_profile.availability %}
                     <ul>
-                        {% for day, hours in caregiver.availability.items %}
-                            <li><strong>{{ day|title }}:</strong> {{ hours.start }} – {{ hours.end }}</li>
+                        {% for day, periods in org_caregiver.caregiver_profile.availability.items %}
+                            <li>
+                                <strong>{{ day|title }}:</strong>
+                                {% for period in periods %}
+                                    {% if period == "morning" %}Morning (6 AM–12 PM){% endif %}
+                                    {% if period == "afternoon" %}Afternoon (12–5 PM){% endif %}
+                                    {% if period == "evening" %}Evening (5–10 PM){% endif %}
+                                    {% if period == "overnight" %}Overnight (10 PM–6 AM){% endif %}
+                                    {% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </li>
                         {% endfor %}
                     </ul>
                 {% else %}
@@ -109,11 +86,11 @@ Caregiver Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Experience, Language, Protocols</h2>
-                <p><strong>Experience:</strong> {{ caregiver.experience_with|join:", "|default:"None selected" }}</p>
-                <p><strong>Languages spoken:</strong> {{ caregiver.languages_spoken|join:", "|default:"None selected" }}</p>
-                <p><strong>Pathogen protocols:</strong> {{ caregiver.pathogen_protocols|join:", "|default:"None selected" }}</p>
-                <p><strong>Certified IHSS worker:</strong> {{ caregiver.certified_ihss_worker|yesno:"Yes,No" }}</p>
-                <p><strong>Additional certifications:</strong> {{ caregiver.additional_certifications|default:"Not provided" }}</p>
+                <p><strong>Experience:</strong> {{ org_caregiver.caregiver_profile.experience_with|join:", "|default:"None selected" }}</p>
+                <p><strong>Languages spoken:</strong> {{ org_caregiver.caregiver_profile.languages_spoken|join:", "|default:"None selected" }}</p>
+                <p><strong>Pathogen protocols:</strong> {{ org_caregiver.caregiver_profile.pathogen_protocols|join:", "|default:"None selected" }}</p>
+                <p><strong>Certified IHSS worker:</strong> {{ org_caregiver.caregiver_profile.certified_ihss_worker|yesno:"Yes,No" }}</p>
+                <p><strong>Additional certifications:</strong> {{ org_caregiver.caregiver_profile.additional_certifications|default:"Not provided" }}</p>
             </div>
         </div>
     </div>
@@ -123,9 +100,9 @@ Caregiver Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Profile Notes</h2>
-                <p><strong>Bio:</strong> {{ caregiver.bio|default:"Not provided" }}</p>
-                <p><strong>Other ways to find work:</strong> {{ caregiver.other_ways_find_work|default:"Not provided" }}</p>
-                <p><strong>Helpful for finding work:</strong> {{ caregiver.helpful_for_finding_work|default:"Not provided" }}</p>
+                <p><strong>Bio:</strong> {{ org_caregiver.caregiver_profile.bio|default:"Not provided" }}</p>
+                <p><strong>Other ways to find work:</strong> {{ org_caregiver.caregiver_profile.other_ways_find_work|default:"Not provided" }}</p>
+                <p><strong>Helpful for finding work:</strong> {{ org_caregiver.caregiver_profile.helpful_for_finding_work|default:"Not provided" }}</p>
             </div>
         </div>
     </div>
@@ -135,12 +112,12 @@ Caregiver Review
         <div class="card app-card">
             <div class="card-content">
                 <h2 class="title is-5">Agreements & Metadata</h2>
-                <p><strong>Availability confirmation agreement:</strong> {{ caregiver.availability_confirmation_agreement|yesno:"Yes,No" }}</p>
-                <p><strong>Wants training updates:</strong> {{ caregiver.wants_training_updates|yesno:"Yes,No" }}</p>
-                <p><strong>Release of liability signed:</strong> {{ caregiver.release_of_liability|yesno:"Yes,No" }}</p>
-                <p><strong>Signed date:</strong> {{ caregiver.signed_date }}</p>
-                <p><strong>Profile completed:</strong> {{ caregiver.profile_completed|yesno:"Yes,No" }}</p>
-                <p><strong>Created at:</strong> {{ caregiver.created_at }}</p>
+                <p><strong>Availability confirmation agreement:</strong> {{ org_caregiver.caregiver_profile.availability_confirmation_agreement|yesno:"Yes,No" }}</p>
+                <p><strong>Wants training updates:</strong> {{ org_caregiver.caregiver_profile.wants_training_updates|yesno:"Yes,No" }}</p>
+                <p><strong>Release of liability signed:</strong> {{ org_caregiver.caregiver_profile.release_of_liability|yesno:"Yes,No" }}</p>
+                <p><strong>Signed date:</strong> {{ org_caregiver.caregiver_profile.signed_date }}</p>
+                <p><strong>Profile completed:</strong> {{ org_caregiver.caregiver_profile.profile_completed|yesno:"Yes,No" }}</p>
+                <p><strong>Created at:</strong> {{ org_caregiver.created_at }}</p>
             </div>
         </div>
     </div>

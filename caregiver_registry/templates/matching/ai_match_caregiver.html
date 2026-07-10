@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}AI Assisted Match — Best Clients for You{% endblock %}
+{% block content %}
+
+<div class="mb-4">
+  <h1 class="title is-2">✨ AI Assisted Match</h1>
+  <p class="subtitle is-6">Top suggestions based on your profile, availability, and selected tags.</p>
+  <a href="{% url 'caregiver_dashboard' %}" class="button is-light is-small">← Back to Dashboard</a>
+</div>
+
+<!-- Tag filter form -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-6">Filter by Tags</h2>
+    <form id="ai-filter-form" method="get" action="">
+      <div class="field is-grouped is-grouped-multiline">
+        {% for tag in all_tags %}
+          <div class="control">
+            <label class="checkbox tag-checkbox">
+              <input type="checkbox" name="tag_ids" value="{{ tag.pk }}"
+                {% if tag.pk in selected_tag_ids %}checked{% endif %}>
+              #{{ tag.name }}
+            </label>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="buttons mt-3">
+        <button type="submit" class="button is-info is-small">Refine Suggestions</button>
+        <a href="{% url 'ai_match_caregiver' %}" class="button is-light is-small">Clear Tags</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if results %}
+<div class="card app-card">
+  <div class="card-content">
+    <h2 class="title is-5">Top Client Matches</h2>
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Match Score</th>
+            <th>Matched Tags</th>
+            <th>AI Reasoning</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in results %}
+          <tr>
+            <td><a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.display_name }}</a></td>
+            <td>
+              <span class="tag {% if result.score >= 70 %}is-success{% elif result.score >= 40 %}is-warning{% else %}is-light{% endif %}">
+                {{ result.score }}
+              </span>
+            </td>
+            <td>
+              {% for tag in result.details.tag_overlap.overlapping %}
+                <span class="tag is-info is-light is-small">#{{ tag }}</span>
+              {% empty %}—{% endfor %}
+            </td>
+            <td class="is-size-7">{{ result.ai_reasoning }}</td>
+            <td>
+              <form method="post" action="{% url 'caregiver_request_match' result.client.pk %}">
+                {% csrf_token %}
+                {% for tag_id in selected_tag_ids %}
+                  <input type="hidden" name="tag_ids" value="{{ tag_id }}">
+                {% endfor %}
+                <button type="submit" class="button is-primary is-small">Request Match</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/_pagination.html" with page_obj=results page_param="ai_page" %}
+  </div>
+</div>
+{% else %}
+<div class="notification is-light">No suggestions found. Try adjusting your tags or check back later.</div>
+{% endif %}
+
+{% endblock %}

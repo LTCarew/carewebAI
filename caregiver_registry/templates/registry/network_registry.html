@@ -1,116 +1,233 @@
 {% extends "base.html" %}
-
-{% block title %}
-Network Registry
-{% endblock %}
+{% block title %}Network Registry{% endblock %}
 
 {% block content %}
+<!-- ═══════════════════════════════════════════════════════
+     Page Header
+     ════════════════════════════════════════════════════════ -->
 <div class="mb-5">
-    <h1 class="title is-2">Network Registry</h1>
-    {% if organization_name %}
-        <p class="subtitle is-5">Organization: {{ organization_name }}</p>
-    {% endif %}
-
-    {% if is_admin_staff %}
-        <form method="get" class="mb-4">
-            <div class="field is-grouped is-align-items-center">
-                <label class="label mb-0 mr-3" for="registry-view-select">Select registry view</label>
-                <div class="control">
-                    <div class="select">
-                        <select id="registry-view-select" name="view" onchange="this.form.submit()">
-                            <option value="clients" {% if selected_view == "clients" %}selected{% endif %}>
-                                View clients in network
-                            </option>
-                            <option value="caregivers" {% if selected_view == "caregivers" %}selected{% endif %}>
-                                View caregivers in network
-                            </option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </form>
-    {% endif %}
+  <h1 class="title is-2">Network Registry</h1>
+  <p class="subtitle is-5 has-text-grey">{{ organization_name }}</p>
 </div>
 
-{% if selected_view == "caregivers" %}
-    <div class="card app-card">
-        <div class="card-content">
-            <h2 class="title is-4">Caregivers in Network</h2>
-            <div class="table-container">
-                <table class="table is-fullwidth is-striped is-hoverable">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for caregiver in caregivers %}
-                            <tr>
-                                <td>{{ caregiver.name }}</td>
-                                <td>{{ caregiver.email }}</td>
-                                <td>{{ caregiver.phone }}</td>
-                                <td>
-                                    {% if caregiver.status == "approved" %}
-                                        <span class="tag is-success">Approved</span>
-                                    {% elif caregiver.status == "rejected" %}
-                                        <span class="tag is-danger">Denied</span>
-                                    {% else %}
-                                        <span class="tag is-warning">Pending</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="4">No caregivers found in this network.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+<!-- ═══════════════════════════════════════════════════════
+     STAFF / ADMIN: Matching Form
+     - Direction toggle (find clients for a caregiver OR find caregivers for a client)
+     - Only the relevant dropdown is shown based on the toggle
+     - Tags / criteria selection
+     ════════════════════════════════════════════════════════ -->
+{% if is_admin_staff %}
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <h2 class="title is-5">Find Matches</h2>
+
+    <form method="get" action="">
+      {# ── Direction toggle ── #}
+      <div class="field mb-4">
+        <label class="label">I want to find matches for a…</label>
+        <div class="buttons has-addons">
+          <a href="?match_type=find_clients{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
+             class="button {% if match_direction == 'find_clients' %}is-link is-selected{% else %}is-light{% endif %}">
+            Careworker → show matching Clients
+          </a>
+          <a href="?match_type=find_caregivers{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
+             class="button {% if match_direction == 'find_caregivers' %}is-link is-selected{% else %}is-light{% endif %}">
+            Client → show matching Careworkers
+          </a>
         </div>
-    </div>
-{% elif selected_view == "clients" %}
-    <div class="card app-card">
-        <div class="card-content">
-            <h2 class="title is-4">Clients in Network</h2>
-            <div class="table-container">
-                <table class="table is-fullwidth is-striped is-hoverable">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for client in clients %}
-                            <tr>
-                                <td>{{ client.name }}</td>
-                                <td>{{ client.email }}</td>
-                                <td>{{ client.phone }}</td>
-                                <td>
-                                    {% if client.status == "approved" %}
-                                        <span class="tag is-success">Approved</span>
-                                    {% elif client.status == "rejected" %}
-                                        <span class="tag is-danger">Denied</span>
-                                    {% else %}
-                                        <span class="tag is-warning">Pending</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="4">No clients found in this network.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+      </div>
+
+      <input type="hidden" name="match_type" value="{{ match_direction }}">
+
+      {# ── Caregiver dropdown (shown only when direction is find_clients) ── #}
+      {% if match_direction == "find_clients" %}
+      <div class="field">
+        <label class="label">Select Careworker</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select name="caregiver_id">
+              <option value="">— Select a Careworker —</option>
+              {% for rel in org_caregivers %}
+                <option value="{{ rel.caregiver_profile.pk }}"
+                  {% if selected_caregiver and selected_caregiver.pk == rel.caregiver_profile.pk %}selected{% endif %}>
+                  {{ rel.caregiver_profile.user_profile.display_name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
-    </div>
+      </div>
+      {% endif %}
+
+      {# ── Client dropdown (shown only when direction is find_caregivers) ── #}
+      {% if match_direction == "find_caregivers" %}
+      <div class="field">
+        <label class="label">Select Client</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select name="client_id">
+              <option value="">— Select a Client —</option>
+              {% for rel in org_clients %}
+                <option value="{{ rel.client_profile.pk }}"
+                  {% if selected_client and selected_client.pk == rel.client_profile.pk %}selected{% endif %}>
+                  {{ rel.client_profile.user_profile.display_name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# ── Tags / criteria ── #}
+      <div class="field mt-4">
+        <label class="label">Filter by Tags / Care Criteria <span class="has-text-grey is-size-7">(select at least one to see results)</span></label>
+        <div class="field is-grouped is-grouped-multiline">
+          {% for tag in all_tags %}
+            <div class="control">
+              <label class="checkbox tag is-link is-light mr-1 mb-1" style="cursor:pointer; padding: 0.4rem 0.75rem;">
+                <input type="checkbox" name="tag_ids" value="{{ tag.pk }}"
+                  {% if tag.pk in selected_tag_ids %}checked{% endif %}>
+                #{{ tag.name }}
+              </label>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="buttons mt-4">
+        <button type="submit" class="button is-primary">Find Matches</button>
+        <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
+        <a href="?match_type={{ match_direction }}" class="button is-light">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Staff results ── #}
+{% if match_results %}
+  {% include "registry/_registry_match_results.html" with results=match_results role=user_role match_direction=match_direction selected_caregiver=selected_caregiver selected_client=selected_client selected_tag_ids=selected_tag_ids %}
+{% elif selected_tag_ids %}
+  {# Tags were selected but no person chosen yet (or no results) #}
+  {% if match_direction == "find_clients" and not selected_caregiver %}
+  <div class="notification is-warning is-light">
+    Please select a careworker above to see matching clients.
+  </div>
+  {% elif match_direction == "find_caregivers" and not selected_client %}
+  <div class="notification is-warning is-light">
+    Please select a client above to see matching careworkers.
+  </div>
+  {% else %}
+  <div class="notification is-light">
+    No matches found for the selected criteria.
+  </div>
+  {% endif %}
+{% else %}
+<div class="notification is-light">
+  Select a person and at least one tag above to find matches within your network.
+</div>
 {% endif %}
+
+{% endif %}{# end is_admin_staff #}
+
+
+<!-- ═══════════════════════════════════════════════════════
+     CAREWORKER: Select tags to find matching clients
+     ════════════════════════════════════════════════════════ -->
+{% if user_role == "caregiver" %}
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <h2 class="title is-5">Find Clients</h2>
+    <p class="is-size-7 has-text-grey mb-4">
+      Select the care criteria you can provide. You'll see people in your network that match.
+    </p>
+
+    <form method="get" action="">
+      <div class="field">
+        <label class="label">Care Tags / Criteria <span class="has-text-grey is-size-7">(select at least one)</span></label>
+        <div class="field is-grouped is-grouped-multiline">
+          {% for tag in all_tags %}
+            <div class="control">
+              <label class="checkbox tag is-success is-light mr-1 mb-1" style="cursor:pointer; padding: 0.4rem 0.75rem;">
+                <input type="checkbox" name="tag_ids" value="{{ tag.pk }}"
+                  {% if tag.pk in selected_tag_ids %}checked{% endif %}>
+                #{{ tag.name }}
+              </label>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="buttons mt-4">
+        <button type="submit" class="button is-primary">Find Clients</button>
+        <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
+        <a href="{% url 'registry_network' %}" class="button is-light">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if match_results %}
+  {% include "registry/_registry_match_results.html" with results=match_results role=user_role match_direction=match_direction selected_tag_ids=selected_tag_ids %}
+{% elif selected_tag_ids %}
+<div class="notification is-light">
+  No matching clients found for the selected criteria.
+</div>
+{% else %}
+<div class="notification is-light">
+  Select at least one care tag above to find clients in your network.
+</div>
+{% endif %}
+{% endif %}{# end caregiver #}
+
+
+<!-- ═══════════════════════════════════════════════════════
+     CLIENT: Select tags to find matching careworkers
+     ════════════════════════════════════════════════════════ -->
+{% if user_role == "client" %}
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <h2 class="title is-5">Find Matching Careworkers</h2>
+    <p class="is-size-7 has-text-grey mb-4">
+      Select the care needs you require. You'll see careworkers in your network that can help.
+    </p>
+
+    <form method="get" action="">
+      <div class="field">
+        <label class="label">Care Needs / Tags <span class="has-text-grey is-size-7">(select at least one)</span></label>
+        <div class="field is-grouped is-grouped-multiline">
+          {% for tag in all_tags %}
+            <div class="control">
+              <label class="checkbox tag is-warning is-light mr-1 mb-1" style="cursor:pointer; padding: 0.4rem 0.75rem;">
+                <input type="checkbox" name="tag_ids" value="{{ tag.pk }}"
+                  {% if tag.pk in selected_tag_ids %}checked{% endif %}>
+                #{{ tag.name }}
+              </label>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="buttons mt-4">
+        <button type="submit" class="button is-primary">Find Careworkers</button>
+        <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
+        <a href="{% url 'registry_network' %}" class="button is-light">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if match_results %}
+  {% include "registry/_registry_match_results.html" with results=match_results role=user_role match_direction=match_direction selected_tag_ids=selected_tag_ids %}
+{% elif selected_tag_ids %}
+<div class="notification is-light">
+  No matching careworkers found for the selected criteria.
+</div>
+{% else %}
+<div class="notification is-light">
+  Select at least one care need above to find matching careworkers in your network.
+</div>
+{% endif %}
+{% endif %}{# end client #}
+
 {% endblock %}

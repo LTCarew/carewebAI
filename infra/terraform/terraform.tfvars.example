@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────
+# CareWeb Registry — Example Terraform variable values
+#
+# 1. Copy this file: cp terraform.tfvars.example terraform.tfvars
+# 2. Fill in your real values in terraform.tfvars
+# 3. NEVER commit terraform.tfvars to git (it contains secrets)
+# ─────────────────────────────────────────────────────────────
+
+# Your GCP project ID (found in the GCP Console dashboard)
+project_id = "your-gcp-project-id"
+
+# GCP region — us-central1 is usually cheapest for Cloud Run + Cloud SQL
+region = "us-central1"
+
+# Short name prefix for all resources (keep lowercase, no spaces)
+app_name = "careweb"
+
+# Docker image tag to deploy (use "latest" or a specific git SHA)
+image_tag = "latest"
+
+# ── Cloud SQL ────────────────────────────────────────────────
+# db-f1-micro   ~$7/month  — fine for development / low traffic
+# db-g1-small   ~$25/month — better for production
+db_tier     = "db-f1-micro"
+db_name     = "careweb"
+db_user     = "careweb_user"
+db_password = "CHANGE_ME_strong_password_here"
+
+# ── Django ───────────────────────────────────────────────────
+# Generate a secret key: python -c "import secrets; print(secrets.token_urlsafe(50))"
+django_secret_key = "CHANGE_ME_generate_a_real_django_secret_key"
+
+# ── OpenAI ───────────────────────────────────────────────────
+openai_api_key = "sk-CHANGE_ME"
+
+# ── Cloud Run scaling ────────────────────────────────────────
+cloud_run_min_instances = 0   # 0 = scale to zero (cheapest)
+cloud_run_max_instances = 5
+cloud_run_cpu           = "1"
+cloud_run_memory        = "512Mi"
+
+# ── Email ────────────────────────────────────────────────────
+email_host_user     = "your-email@gmail.com"
+email_host_password = "your-app-password"
+
+# ── Public site URL (fill in after first `terraform apply`) ──
+# Once Cloud Run is deployed, copy the URL from `terraform output cloud_run_url`
+# and paste it here, then re-run `terraform apply` to register it as ALLOWED_HOST.
+site_url = "https://careweb-XXXXX-uc.a.run.app"

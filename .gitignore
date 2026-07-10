@@ -41,3 +41,15 @@ htmlcov/
 
 # Migrations cache
 *.sqlite3-journal
+
+# Terraform secrets — never commit actual variable values
+infra/terraform/terraform.tfvars
+infra/terraform/*.tfvars
+!infra/terraform/terraform.tfvars.example
+
+# Terraform state and local working files
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.backup
+infra/terraform/crash.log

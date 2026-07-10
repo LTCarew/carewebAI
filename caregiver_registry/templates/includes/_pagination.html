@@ -1,0 +1,45 @@
+{% comment %}
+Reusable pagination partial.
+
+Required context:
+  page_obj    — Django Page object (from Paginator.get_page)
+  page_param  — GET parameter name for this table's page (e.g. "caregivers_page")
+
+Usage:
+  {% include "includes/_pagination.html" with page_obj=my_page page_param="my_page_param" %}
+{% endcomment %}
+
+{% if page_obj.has_other_pages %}
+<nav class="pagination is-centered mt-3" role="navigation" aria-label="pagination">
+  {% if page_obj.has_previous %}
+    <a class="pagination-previous"
+       href="?{% for key, val in request.GET.items %}{% if key != page_param %}{{ key }}={{ val }}&{% endif %}{% endfor %}{{ page_param }}={{ page_obj.previous_page_number }}">
+      Previous
+    </a>
+  {% else %}
+    <a class="pagination-previous" disabled>Previous</a>
+  {% endif %}
+
+  {% if page_obj.has_next %}
+    <a class="pagination-next"
+       href="?{% for key, val in request.GET.items %}{% if key != page_param %}{{ key }}={{ val }}&{% endif %}{% endfor %}{{ page_param }}={{ page_obj.next_page_number }}">
+      Next
+    </a>
+  {% else %}
+    <a class="pagination-next" disabled>Next</a>
+  {% endif %}
+
+  <ul class="pagination-list">
+    {% for i in page_obj.paginator.page_range %}
+      <li>
+        <a class="pagination-link {% if i == page_obj.number %}is-current{% endif %}"
+           href="?{% for key, val in request.GET.items %}{% if key != page_param %}{{ key }}={{ val }}&{% endif %}{% endfor %}{{ page_param }}={{ i }}"
+           aria-label="Page {{ i }}"
+           {% if i == page_obj.number %}aria-current="page"{% endif %}>
+          {{ i }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}

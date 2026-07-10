@@ -1,21 +1,142 @@
 {% extends "base.html" %}
 
+{% block title %}Careworker Dashboard{% endblock %}
+
 {% block content %}
-<div class="columns is-centered">
-    <div class="column is-8-tablet is-7-desktop">
-        <div class="card app-card app-dashboard-card">
-            <div class="card-content">
-                <h1 class="title is-2">Caregiver Dashboard</h1>
-
-                <p class="subtitle is-5">
-                    You have caregiver access.
-                </p>
-
-                <a class="button is-link is-large" href="{% url 'registry_network' %}">
-                    View Client Registry
-                </a>
-            </div>
-        </div>
-    </div>
+<div class="mb-5">
+  <h1 class="title is-2">Careworker Dashboard</h1>
+  {% if caregiver_profile %}
+    <p class="subtitle is-5">Welcome, {{ caregiver_profile.user_profile.display_name }}.</p>
+  {% endif %}
+  {% comment %} <div class="buttons">
+    <a href="{% url 'registry_network' %}" class="button is-link">View Clients</a>
+    <a href="{% url 'ai_match_caregiver' %}" class="button is-info">✨ AI Assisted Match</a>
+  </div> {% endcomment %}
 </div>
+
+{% if unread_notifications %}
+<div class="box mb-4" aria-label="Notifications">
+  <h2 class="title is-6 mb-2">🔔 Notifications</h2>
+  {% for notif in unread_notifications %}
+    <p class="is-size-7 mb-1"><strong>{{ notif.subject }}</strong> — {{ notif.message|truncatewords:15 }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Pending My Approval -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">⏳ Pending My Approval</h2>
+    {% with matches=pending_my_approval viewer_role="caregiver" show_actions=True page_param="p_mine" empty_message="No matches waiting for your approval." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+<!-- Pending Client Approval -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">👤 Pending Client Approval</h2>
+    {% with matches=pending_client viewer_role="caregiver" show_actions=False page_param="p_client" empty_message="No matches waiting for approval." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+<!-- Active Matches -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">✅ Active Matches</h2>
+    {% with matches=active_matches viewer_role="caregiver" show_actions=False page_param="p_active" empty_message="No active matches yet." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+<!-- Declined / Cancelled -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">❌ Declined / Cancelled</h2>
+    {% with matches=declined_matches viewer_role="caregiver" show_actions=False page_param="p_declined" empty_message="No declined matches." %}
+      {% include "matching/_match_table.html" %}
+    {% endwith %}
+  </div>
+</div>
+
+<!-- Schedule Requests -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">📅 Schedule Requests</h2>
+    {% if pending_schedule_entries %}
+    <div class="table-container" role="region" aria-label="Pending schedule entries for careworker">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Person Looking for Support</th>
+            <th scope="col">Schedule Status</th>
+            <th scope="col">Day</th>
+            <th scope="col">Start</th>
+            <th scope="col">End</th>
+            <th scope="col">Your Status</th>
+            <th scope="col">Support Person Status</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in pending_schedule_entries %}
+          <tr>
+            <td>
+              <a href="{% url 'schedule_detail' entry.schedule.pk %}">
+                {{ entry.schedule.client.user_profile.display_name }}
+              </a>
+            </td>
+            <td>
+              <span class="tag is-info is-light">{{ entry.schedule.get_status_display }}</span>
+            </td>
+            <td>{{ entry.get_day_of_week_display }}</td>
+            <td>{{ entry.start_time|time:"g:i A" }}</td>
+            <td>{{ entry.end_time|time:"g:i A" }}</td>
+            <td><span class="tag is-warning is-light">Pending</span></td>
+            <td>
+              {% if entry.support_person_status == "approved" %}
+                <span class="tag is-success is-light">Approved</span>
+              {% elif entry.support_person_status == "rejected" %}
+                <span class="tag is-danger is-light">Rejected</span>
+              {% else %}
+                <span class="tag is-warning is-light">Pending</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="buttons are-small">
+                <form method="post"
+                      action="{% url 'schedule_entry_caregiver_respond' entry.pk 'approve' %}">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="button is-success is-small"
+                          aria-label="Approve {{ entry.get_day_of_week_display }} {{ entry.start_time|time:'g:i A' }} to {{ entry.end_time|time:'g:i A' }} for {{ entry.schedule.client.user_profile.display_name }}">
+                    Approve
+                  </button>
+                </form>
+                <form method="post"
+                      action="{% url 'schedule_entry_caregiver_respond' entry.pk 'reject' %}">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="button is-danger is-small"
+                          aria-label="Reject {{ entry.get_day_of_week_display }} {{ entry.start_time|time:'g:i A' }} to {{ entry.end_time|time:'g:i A' }} for {{ entry.schedule.client.user_profile.display_name }}">
+                    Reject
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="has-text-grey-light is-italic">No schedule entries awaiting your approval.</p>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

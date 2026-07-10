@@ -11,7 +11,7 @@ def default_invite_expiration():
 # Invites
 # ==============================================
 ROLE_CHOICES = [
-    ("caregiver", "Caregiver"),
+    ("caregiver", "Careworker"),
     ("client", "Client"),
 ]
 
@@ -38,12 +38,13 @@ class Invite(models.Model):
 
 
 # ==============================================
-# Caregivers and Clients
+# Shared Choices
 # ==============================================
 STATUS_CHOICES = [
     ("pending", "Pending"),
     ("approved", "Approved"),
     ("rejected", "Rejected"),
+    ("inactive", "Inactive"),
 ]
 
 
@@ -181,7 +182,7 @@ CARE_NEEDS_CHOICES = [
     ("cognitive_disabilities", "Cognitive disability support"),
     ("complex_illnesses", "Complex illness support"),
     ("deaf_community", "d/Deaf community support"),
-    ("dementia", "Dementia/Alzheimer’s support"),
+    ("dementia", "Dementia/Alzheimer's support"),
     ("developmental_disabilities", "Developmental disability support"),
     ("elders", "Elder / older adult support"),
     ("emergency_preparedness", "Emergency preparedness planning"),
@@ -206,18 +207,25 @@ CARE_NEEDS_CHOICES = [
 ]
 
 
-class Caregiver(models.Model):
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+# ==============================================
+# Caregiver and Client Profiles
+# ==============================================
 
-    name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=25)
-    email = models.EmailField()
-
-    contact_preferences = models.JSONField(default=list, blank=True)
-    pronouns = models.CharField(max_length=50, choices=PRONOUN_CHOICES, blank=True)
+class CaregiverProfile(models.Model):
+    """
+    Stores caregiver-specific information for a person.
+    Links to UserProfile for shared contact info.
+    """
+    user_profile = models.OneToOneField(
+        "accounts.UserProfile",
+        on_delete=models.CASCADE,
+        related_name="caregiver_profile"
+    )
 
     base_zip_code = models.CharField(max_length=10)
     willing_to_work_cities = models.JSONField(default=list, blank=True)
+
+    attendant_care_programs = models.JSONField(default=list, blank=True)
 
     transportation = models.JSONField(default=list, blank=True)
     availability = models.JSONField(default=dict, blank=True)
@@ -234,39 +242,35 @@ class Caregiver(models.Model):
     languages_spoken = models.JSONField(default=list, blank=True)
     pathogen_protocols = models.JSONField(default=list, blank=True)
 
+    desired_hours_per_week = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Desired number of work hours per week"
+    )
+
     rate = models.CharField(max_length=50, choices=RATE_CHOICES)
 
     bio = models.TextField(blank=True)
 
-    availability_confirmation_agreement = models.BooleanField(default=False)
     wants_training_updates = models.BooleanField(default=False)
 
-    other_ways_find_work = models.TextField(blank=True)
-    helpful_for_finding_work = models.TextField(blank=True)
-
-    release_of_liability = models.BooleanField(default=False)
-    signed_date = models.DateField()
-
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    profile_completed = models.BooleanField(default=False)
-
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name
+        return f"CaregiverProfile: {self.user_profile.display_name}"
 
 
-class Client(models.Model):
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+class ClientProfile(models.Model):
+    """
+    Stores client-specific care needs and preferences.
+    Links to UserProfile for shared contact info.
+    """
+    user_profile = models.OneToOneField(
+        "accounts.UserProfile",
+        on_delete=models.CASCADE,
+        related_name="client_profile"
+    )
 
-    name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=25)
-    email = models.EmailField()
-
-    contact_preferences = models.JSONField(default=list, blank=True)
-    pronouns = models.CharField(max_length=50, choices=PRONOUN_CHOICES, blank=True)
-
-    address = models.TextField()
     base_zip_code = models.CharField(max_length=10)
 
     attendant_care_programs = models.JSONField(default=list, blank=True)
@@ -280,14 +284,547 @@ class Client(models.Model):
     care_needs = models.JSONField(default=list, blank=True)
     additional_care_needs = models.TextField(blank=True)
 
-    preferences = models.TextField(blank=True)
-
     pathogen_protocol_preferences = models.JSONField(default=list, blank=True)
 
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    profile_completed = models.BooleanField(default=False)
-
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name
+        return f"ClientProfile: {self.user_profile.display_name}"
+
+
+# ==============================================
+# Organization Relationships (Junction Tables)
+# ==============================================
+
+class OrganizationCaregiver(models.Model):
+    """
+    Junction table linking caregivers to organizations.
+    Caregivers can belong to multiple organizations.
+    """
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="caregiver_relationships"
+    )
+
+    caregiver_profile = models.ForeignKey(
+        CaregiverProfile,
+        on_delete=models.CASCADE,
+        related_name="organization_relationships"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    approved_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_caregivers"
+    )
+
+    approved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("organization", "caregiver_profile")
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["caregiver_profile", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.caregiver_profile} - {self.organization} - {self.status}"
+
+
+class OrganizationClient(models.Model):
+    """
+    Junction table linking clients to organizations.
+    Clients can belong to multiple organizations.
+    """
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="client_relationships"
+    )
+
+    client_profile = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="organization_relationships"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    approved_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_clients"
+    )
+
+    approved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("organization", "client_profile")
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["client_profile", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.client_profile} - {self.organization} - {self.status}"
+
+
+# ==============================================
+# Support Coordinator Models
+# ==============================================
+
+class SupportCoordinatorProfile(models.Model):
+    """
+    Profile for support coordinators who assist clients.
+    Support coordinators are invited by clients and can help manage
+    client information and caregiver relationships based on permissions.
+    """
+    user_profile = models.OneToOneField(
+        "accounts.UserProfile",
+        on_delete=models.CASCADE,
+        related_name="support_coordinator_profile"
+    )
+    
+    # Information about the coordinator
+    relationship_to_clients = models.CharField(
+        max_length=100,
+        help_text="E.g., Family member, Agency representative, Friend, etc."
+    )
+    credentials = models.TextField(
+        blank=True,
+        help_text="Professional credentials or qualifications"
+    )
+    certifications = models.TextField(
+        blank=True,
+        help_text="Relevant certifications"
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Support Coordinator: {self.user_profile.display_name}"
+    
+    class Meta:
+        verbose_name = "Support Coordinator Profile"
+        verbose_name_plural = "Support Coordinator Profiles"
+
+
+class ClientCoordinator(models.Model):
+    """
+    Junction table linking clients with their support coordinators.
+    Includes client-controlled permissions for each coordinator.
+    """
+    client_profile = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="coordinator_relationships"
+    )
+    
+    coordinator_profile = models.ForeignKey(
+        SupportCoordinatorProfile,
+        on_delete=models.CASCADE,
+        related_name="client_relationships"
+    )
+    
+    # Client-controlled permissions
+    can_edit_profile = models.BooleanField(
+        default=False,
+        help_text="Can the coordinator edit the client's profile?"
+    )
+    can_approve_caregivers = models.BooleanField(
+        default=False,
+        help_text="Can the coordinator approve/reject caregiver matches?"
+    )
+    
+    # Relationship status
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('active', 'Active'),
+            ('inactive', 'Inactive')
+        ],
+        default='pending',
+        help_text="Status of the coordinator relationship"
+    )
+    
+    # Tracking
+    invited_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="coordinator_invitations_sent"
+    )
+    invited_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['client_profile', 'coordinator_profile']
+        verbose_name = "Client-Coordinator Relationship"
+        verbose_name_plural = "Client-Coordinator Relationships"
+        indexes = [
+            models.Index(fields=["client_profile", "status"]),
+            models.Index(fields=["coordinator_profile", "status"]),
+        ]
+    
+    def __str__(self):
+        return (
+            f"{self.coordinator_profile.user_profile.display_name} → "
+            f"{self.client_profile.user_profile.display_name} ({self.status})"
+        )
+
+
+class CoordinatorInvite(models.Model):
+    """
+    Invitation for someone to become a support coordinator for a client.
+    Clients send these invitations via email with a unique token link.
+    """
+    client_profile = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="coordinator_invites"
+    )
+    
+    email = models.EmailField(help_text="Email address of the invited coordinator")
+    
+    token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text="Unique token for the invitation link"
+    )
+    
+    invited_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.CASCADE,
+        related_name="coordinator_invites_created"
+    )
+    
+    # Lifecycle tracking
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(
+        default=default_invite_expiration,
+        help_text="Invitation expires 7 days after creation"
+    )
+    used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the invitation was accepted"
+    )
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Coordinator Invitation"
+        verbose_name_plural = "Coordinator Invitations"
+        indexes = [
+            models.Index(fields=["token"]),
+            models.Index(fields=["client_profile", "email"]),
+        ]
+    
+    def __str__(self):
+        return f"Invite for {self.email} to support {self.client_profile.user_profile.display_name}"
+    
+    def is_expired(self):
+        """Check if the invitation has expired."""
+        return timezone.now() > self.expires_at
+    
+    def is_used(self):
+        """Check if the invitation has been used."""
+        return self.used_at is not None
+    
+    def is_valid(self):
+        """Check if the invitation is still valid (not expired and not used)."""
+        return not self.is_expired() and not self.is_used()
+
+
+# ==============================================
+# Scheduling Models
+# ==============================================
+
+SCHEDULE_STATUS_CHOICES = [
+    ("draft",                "Draft"),
+    ("submitted",            "Submitted"),
+    ("partially_approved",   "Partially Approved"),
+    ("approved",             "Approved"),
+    ("rejected",             "Rejected"),
+    ("cancelled",            "Cancelled"),
+]
+
+ENTRY_REVIEW_STATUS_CHOICES = [
+    ("pending",  "Pending"),
+    ("approved", "Approved"),
+    ("rejected", "Rejected"),
+]
+
+DAY_OF_WEEK_CHOICES = [
+    ("monday",    "Monday"),
+    ("tuesday",   "Tuesday"),
+    ("wednesday", "Wednesday"),
+    ("thursday",  "Thursday"),
+    ("friday",    "Friday"),
+    ("saturday",  "Saturday"),
+    ("sunday",    "Sunday"),
+]
+
+
+class Schedule(models.Model):
+    """
+    A proposed work schedule created by a client for a matched caregiver.
+    May also include a support person (coordinator) who must co-approve each entry.
+
+    Lifecycle:
+      draft → submitted → (partially_approved | approved | rejected) | cancelled
+
+    Editing is only allowed while status == 'draft'.
+    After submission the client must cancel and recreate to make changes.
+    """
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.CASCADE,
+        related_name="schedules",
+    )
+    client = models.ForeignKey(
+        ClientProfile,
+        on_delete=models.CASCADE,
+        related_name="schedules",
+    )
+    caregiver = models.ForeignKey(
+        CaregiverProfile,
+        on_delete=models.CASCADE,
+        related_name="schedules",
+    )
+    support_person = models.ForeignKey(
+        SupportCoordinatorProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="schedules",
+        help_text="Optional support person/coordinator who also approves this schedule",
+    )
+    match = models.ForeignKey(
+        "matching.Match",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="schedules",
+        help_text="The active match this schedule is attached to",
+    )
+    created_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_schedules",
+    )
+
+    status = models.CharField(
+        max_length=30,
+        choices=SCHEDULE_STATUS_CHOICES,
+        default="draft",
+        db_index=True,
+    )
+
+    notes = models.TextField(blank=True, help_text="Optional notes from the client")
+
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Schedule"
+        verbose_name_plural = "Schedules"
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["client", "status"]),
+            models.Index(fields=["caregiver", "status"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"Schedule #{self.pk}: "
+            f"{self.client.user_profile.display_name} → "
+            f"{self.caregiver.user_profile.display_name} [{self.status}]"
+        )
+
+    # ── Properties ────────────────────────────────────────────────────────────
+
+    @property
+    def is_editable_by_client(self):
+        """Clients can only edit while the schedule is a draft."""
+        return self.status == "draft"
+
+    @property
+    def is_submitted(self):
+        return self.status != "draft"
+
+    @property
+    def all_entries_caregiver_approved(self):
+        return self.entries.exists() and not self.entries.exclude(
+            caregiver_status="approved"
+        ).exists()
+
+    @property
+    def all_entries_support_person_approved(self):
+        if self.support_person is None:
+            return True  # no support person required
+        return self.entries.exists() and not self.entries.exclude(
+            support_person_status="approved"
+        ).exists()
+
+    @property
+    def has_rejections(self):
+        return self.entries.filter(
+            caregiver_status="rejected"
+        ).exists() or self.entries.filter(
+            support_person_status="rejected"
+        ).exists()
+
+    @property
+    def approval_progress(self):
+        """
+        Returns (caregiver_approved_count, support_approved_count, total_count).
+        Useful for displaying progress in dashboards.
+        """
+        total = self.entries.count()
+        cg_approved = self.entries.filter(caregiver_status="approved").count()
+        sp_approved = self.entries.filter(support_person_status="approved").count()
+        return cg_approved, sp_approved, total
+
+    # ── Status Recalculation ──────────────────────────────────────────────────
+
+    def update_status_from_entries(self):
+        """
+        Recalculate and save overall schedule status based on entry statuses.
+
+        Rules:
+          - Any caregiver or support_person entry is 'rejected' → 'rejected'
+          - All entries approved by both caregiver and support_person → 'approved'
+          - Some entries approved, others still pending → 'partially_approved'
+          - All still pending → remains 'submitted'
+        """
+        if self.status in ("draft", "cancelled"):
+            return  # do not auto-update these statuses
+
+        entries = list(self.entries.all())
+        if not entries:
+            return
+
+        if any(
+            e.caregiver_status == "rejected" or e.support_person_status == "rejected"
+            for e in entries
+        ):
+            self.status = "rejected"
+            self.save(update_fields=["status", "updated_at"])
+            return
+
+        cg_all_ok = all(e.caregiver_status == "approved" for e in entries)
+        sp_all_ok = all(
+            e.support_person_status == "approved"
+            for e in entries
+        ) if self.support_person else True
+
+        if cg_all_ok and sp_all_ok:
+            self.status = "approved"
+        elif any(
+            e.caregiver_status == "approved" or e.support_person_status == "approved"
+            for e in entries
+        ):
+            self.status = "partially_approved"
+        else:
+            self.status = "submitted"
+
+        self.save(update_fields=["status", "updated_at"])
+
+
+class ScheduleEntry(models.Model):
+    """
+    A single day/time slot within a Schedule.
+    Each entry requires independent approval from the caregiver and (if assigned)
+    the support person/coordinator.
+    """
+    schedule = models.ForeignKey(
+        Schedule,
+        on_delete=models.CASCADE,
+        related_name="entries",
+    )
+    day_of_week = models.CharField(
+        max_length=15,
+        choices=DAY_OF_WEEK_CHOICES,
+        help_text="Day of the week for this recurring slot",
+    )
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+
+    # ── Caregiver review ─────────────────────────────────────────────────────
+    caregiver_status = models.CharField(
+        max_length=10,
+        choices=ENTRY_REVIEW_STATUS_CHOICES,
+        default="pending",
+    )
+    caregiver_reviewed_at = models.DateTimeField(null=True, blank=True)
+    caregiver_notes = models.TextField(
+        blank=True,
+        help_text="Optional note from caregiver when rejecting",
+    )
+
+    # ── Support person review ────────────────────────────────────────────────
+    support_person_status = models.CharField(
+        max_length=10,
+        choices=ENTRY_REVIEW_STATUS_CHOICES,
+        default="pending",
+    )
+    support_person_reviewed_at = models.DateTimeField(null=True, blank=True)
+    support_person_notes = models.TextField(
+        blank=True,
+        help_text="Optional note from support person when rejecting",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = [
+            "day_of_week",
+            "start_time",
+        ]
+        verbose_name = "Schedule Entry"
+        verbose_name_plural = "Schedule Entries"
+        unique_together = [("schedule", "day_of_week", "start_time", "end_time")]
+
+    def __str__(self):
+        return (
+            f"{self.get_day_of_week_display()} "
+            f"{self.start_time:%I:%M %p}–{self.end_time:%I:%M %p} "
+            f"[cg:{self.caregiver_status} / sp:{self.support_person_status}]"
+        )
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValidationError("End time must be after start time.")

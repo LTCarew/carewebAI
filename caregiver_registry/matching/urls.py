@@ -23,18 +23,21 @@ urlpatterns = [
         name="staff_create_match",
     ),
 
+    # ── Cancel a pending match ────────────────────────────────────────────────
+    # NOTE: This MUST come before match_respond (match/<id>/<action>/) so that
+    # Django's first-match routing sends /match/<id>/cancel/ to match_cancel
+    # and not to match_respond with action="cancel".
+    path(
+        "match/<int:match_id>/cancel/",
+        views.match_cancel,
+        name="match_cancel",
+    ),
+
     # ── Approve or decline a match ────────────────────────────────────────────
     path(
         "match/<int:match_id>/<str:action>/",
         views.match_respond,
         name="match_respond",
-    ),
-
-    # ── Cancel a pending match ────────────────────────────────────────────────
-    path(
-        "match/<int:match_id>/cancel/",
-        views.match_cancel,
-        name="match_cancel",
     ),
 
     # ── AI-assisted matching ──────────────────────────────────────────────────

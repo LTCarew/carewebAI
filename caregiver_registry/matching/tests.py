@@ -45,7 +45,6 @@ def make_user_profile(username, email=None):
     from accounts.models import UserProfile
     profile, _ = UserProfile.objects.get_or_create(
         user=user,
-        defaults={"name": username.title(), "email": user.email},
     )
     return user, profile
 

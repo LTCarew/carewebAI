@@ -101,23 +101,23 @@ def coordinator_signup(request, token):
     
     if request.method == "POST":
         form = CoordinatorSignupForm(request.POST)
-        
+
         if form.is_valid():
-            # Save creates the profile and marks invite as used
-            client_coordinator = form.save(invite)
-            
+            # save() returns (client_coordinator, user) — use the user directly
+            # so we don't need a second DB hit.
+            client_coordinator, coordinator_user = form.save(invite)
+
             messages.success(
                 request,
-                f"Welcome! You are now a support coordinator for {invite.client_profile.user_profile.display_name}."
+                f"Welcome! You are now a support coordinator for "
+                f"{invite.client_profile.user_profile.display_name}. "
+                f"You can log in at any time using your email and the password you just set."
             )
-            
-            # Log the user in (they now have an account)
+
+            # Log the coordinator in immediately.
             from django.contrib.auth import login
-            from .services import get_or_create_user_from_email
-            
-            user = get_or_create_user_from_email(form.cleaned_data['email'])
-            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
-            
+            login(request, coordinator_user, backend='django.contrib.auth.backends.ModelBackend')
+
             return redirect("coordinator_dashboard")
     else:
         # Pre-fill email from invitation
@@ -1141,25 +1141,29 @@ def caregiver_pool(request):
     Show caregivers not yet added to this organization.
     Admins can browse and add them.
     """
+    from .models import CaregiverProfile  # local import to avoid circular deps
+
     unauthorized_redirect = _redirect_if_not_admin_staff(request)
     if unauthorized_redirect:
         return unauthorized_redirect
-    
+
     # Get active organization
     active_org = get_active_organization(request)
-    
+
     if not active_org:
         messages.error(request, "No active organization found.")
         return redirect("org_dashboard")
-    
-    # Get all caregiver profiles
-    all_caregivers = CaregiverProfile.objects.select_related('user_profile').all()
-    
+
+    # Get all caregiver profiles (ordered for consistent pagination)
+    all_caregivers = CaregiverProfile.objects.select_related('user_profile').order_by(
+        'user_profile__user__last_name', 'user_profile__user__first_name'
+    )
+
     # Exclude those already in this organization
     existing_ids = OrganizationCaregiver.objects.filter(
         organization=active_org
     ).values_list('caregiver_profile_id', flat=True)
-    
+
     available_caregivers = all_caregivers.exclude(id__in=existing_ids)
 
     caregivers_page = Paginator(available_caregivers, 10).get_page(request.GET.get("caregivers_page", 1))

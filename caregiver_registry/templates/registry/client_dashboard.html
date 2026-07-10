@@ -7,8 +7,8 @@
     <p class="subtitle is-5">Welcome, {{ client_profile.user_profile.display_name }}.</p>
   {% endif %}
   <div class="buttons">
-    <a href="{% url 'registry_network' %}" class="button is-link">View Careworker Registry</a>
-    <a href="{% url 'ai_match_client' %}" class="button is-info">✨ AI Assisted Match</a>
+    {% comment %} <a href="{% url 'registry_network' %}" class="button is-link">View Careworker Registry</a>
+    <a href="{% url 'ai_match_client' %}" class="button is-info">✨ AI Assisted Match</a> {% endcomment %}
     <a href="{% url 'coordinator_invite_send' %}" class="button is-light">Invite Support Person</a>
   </div>
 </div>

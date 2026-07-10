@@ -36,18 +36,52 @@
             <label class="label" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
             <div class="control">{{ form.email }}</div>
             {% if form.email.errors %}<div class="help is-danger" role="alert">{{ form.email.errors }}</div>{% endif %}
+            <p class="help">You will use this email to log in to your account.</p>
           </div>
 
           <h2 class="title is-5 mt-5 mb-3">Your Information</h2>
 
-          <!-- Full Name -->
+          <!-- First Name -->
           <div class="field">
-            <label class="label" for="{{ form.name.id_for_label }}">
-              {{ form.name.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            <label class="label" for="{{ form.first_name.id_for_label }}">
+              {{ form.first_name.label }}<span class="has-text-danger" aria-label="required"> *</span>
             </label>
-            <div class="control">{{ form.name }}</div>
-            {% if form.name.errors %}<div class="help is-danger" role="alert">{{ form.name.errors }}</div>{% endif %}
+            <div class="control">{{ form.first_name }}</div>
+            {% if form.first_name.errors %}<div class="help is-danger" role="alert">{{ form.first_name.errors }}</div>{% endif %}
           </div>
+
+          <!-- Last Name -->
+          <div class="field">
+            <label class="label" for="{{ form.last_name.id_for_label }}">
+              {{ form.last_name.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.last_name }}</div>
+            {% if form.last_name.errors %}<div class="help is-danger" role="alert">{{ form.last_name.errors }}</div>{% endif %}
+          </div>
+
+          <h2 class="title is-5 mt-5 mb-3">Create Your Login Password</h2>
+
+          <!-- Password -->
+          <div class="field">
+            <label class="label" for="{{ form.password1.id_for_label }}">
+              {{ form.password1.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.password1 }}</div>
+            {% if form.password1.help_text %}<p class="help">{{ form.password1.help_text }}</p>{% endif %}
+            {% if form.password1.errors %}<div class="help is-danger" role="alert">{{ form.password1.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="field">
+            <label class="label" for="{{ form.password2.id_for_label }}">
+              {{ form.password2.label }}<span class="has-text-danger" aria-label="required"> *</span>
+            </label>
+            <div class="control">{{ form.password2 }}</div>
+            {% if form.password2.help_text %}<p class="help">{{ form.password2.help_text }}</p>{% endif %}
+            {% if form.password2.errors %}<div class="help is-danger" role="alert">{{ form.password2.errors }}</div>{% endif %}
+          </div>
+
+          <h2 class="title is-5 mt-5 mb-3">Contact Details</h2>
 
           <!-- Phone -->
           <div class="field">
@@ -100,6 +134,11 @@
             <div class="control">{{ form.certifications }}</div>
             {% if form.certifications.help_text %}<p class="help">{{ form.certifications.help_text }}</p>{% endif %}
             {% if form.certifications.errors %}<div class="help is-danger" role="alert">{{ form.certifications.errors }}</div>{% endif %}
+          </div>
+
+          <div class="notification is-info is-light mt-5">
+            <strong>📌 After accepting:</strong> You'll be logged in automatically. To log in again in future,
+            go to the login page and use your email address and the password you just created above.
           </div>
 
           <div class="buttons mt-5">

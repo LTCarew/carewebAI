@@ -426,6 +426,9 @@ class CoordinatorSignupForm(forms.Form):
     Form for invited coordinators to sign up and accept the invitation.
     Creates User, UserProfile, SupportCoordinatorProfile, and ClientCoordinator records.
     Identity (name, email) is saved on the auth User.
+
+    Password fields allow the coordinator to set credentials they can use to
+    log back in after the initial invite session ends.
     """
     email = forms.EmailField(
         label="Email",
@@ -434,6 +437,18 @@ class CoordinatorSignupForm(forms.Form):
 
     first_name = forms.CharField(max_length=150, label="First Name")
     last_name = forms.CharField(max_length=150, label="Last Name")
+
+    password1 = forms.CharField(
+        label="Password",
+        widget=forms.PasswordInput,
+        help_text="Choose a secure password you'll use to log in later."
+    )
+    password2 = forms.CharField(
+        label="Confirm Password",
+        widget=forms.PasswordInput,
+        help_text="Enter the same password again to confirm."
+    )
+
     phone = forms.CharField(max_length=25, label="Phone Number")
 
     contact_preferences = forms.MultipleChoiceField(
@@ -472,6 +487,14 @@ class CoordinatorSignupForm(forms.Form):
         super().__init__(*args, **kwargs)
         apply_bulma_classes(self)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        pw1 = cleaned_data.get("password1")
+        pw2 = cleaned_data.get("password2")
+        if pw1 and pw2 and pw1 != pw2:
+            raise forms.ValidationError("The two password fields must match.")
+        return cleaned_data
+
     @transaction.atomic
     def save(self, invite):
         from .models import SupportCoordinatorProfile, ClientCoordinator
@@ -482,6 +505,11 @@ class CoordinatorSignupForm(forms.Form):
             first_name=self.cleaned_data['first_name'],
             last_name=self.cleaned_data['last_name'],
         )
+
+        # Set a real, usable password so the coordinator can log in later.
+        user.set_password(self.cleaned_data['password1'])
+        user.is_active = True
+        user.save()
 
         user_profile, _ = UserProfile.objects.update_or_create(
             user=user,
@@ -514,7 +542,8 @@ class CoordinatorSignupForm(forms.Form):
         invite.used_at = timezone.now()
         invite.save()
 
-        return client_coordinator
+        # Return both so the view can log the user in without a second DB hit.
+        return client_coordinator, user
 
 
 # ==============================================

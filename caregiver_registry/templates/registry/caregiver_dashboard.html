@@ -8,10 +8,10 @@
   {% if caregiver_profile %}
     <p class="subtitle is-5">Welcome, {{ caregiver_profile.user_profile.display_name }}.</p>
   {% endif %}
-  <div class="buttons">
+  {% comment %} <div class="buttons">
     <a href="{% url 'registry_network' %}" class="button is-link">View Clients</a>
     <a href="{% url 'ai_match_caregiver' %}" class="button is-info">✨ AI Assisted Match</a>
-  </div>
+  </div> {% endcomment %}
 </div>
 
 {% if unread_notifications %}

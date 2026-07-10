@@ -11,6 +11,14 @@ Required context:
 Optional context:
   action_approve_label — defaults to "Approve"
   action_decline_label — defaults to "Decline"
+
+Behaviour:
+  - When viewer_role == 'caregiver' the "Careworker" column is hidden because
+    every row belongs to the logged-in careworker; only the client counterpart
+    and both status columns are shown.
+  - When viewer_role == 'client' the "Client" column is hidden for the same
+    reason; only the careworker counterpart and both status columns are shown.
+  - When viewer_role == 'staff' (or anything else) both columns are visible.
 {% endcomment %}
 
 {% if matches.object_list %}
@@ -18,8 +26,8 @@ Optional context:
   <table class="table is-fullwidth is-striped is-hoverable" aria-label="{{ section_title|default:'Matches' }}">
     <thead>
       <tr>
-        <th scope="col">Careworker</th>
-        <th scope="col">Client</th>
+        {% if viewer_role != "caregiver" %}<th scope="col">Careworker</th>{% endif %}
+        {% if viewer_role != "client" %}<th scope="col">Client</th>{% endif %}
         <th scope="col">Score</th>
         <th scope="col">Tags</th>
         <th scope="col">Client Status</th>
@@ -30,16 +38,20 @@ Optional context:
     <tbody>
       {% for match in matches %}
       <tr>
+        {% if viewer_role != "caregiver" %}
         <td>
           <a href="{% url 'caregiver_detail' match.caregiver.id %}">
             {{ match.caregiver.user_profile.display_name }}
           </a>
         </td>
+        {% endif %}
+        {% if viewer_role != "client" %}
         <td>
           <a href="{% url 'client_detail' match.client.id %}">
             {{ match.client.user_profile.display_name }}
           </a>
         </td>
+        {% endif %}
         <td>
           {% if match.match_score is not None %}
             <span class="tag {% if match.match_score >= 70 %}is-success{% elif match.match_score >= 40 %}is-warning{% else %}is-light{% endif %}">

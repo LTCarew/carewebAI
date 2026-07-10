@@ -575,6 +575,12 @@ SCHEDULE_STATUS_CHOICES = [
     ("cancelled",            "Cancelled"),
 ]
 
+SCHEDULE_FREQUENCY_CHOICES = [
+    ("weekly",    "Weekly"),
+    ("biweekly",  "Bi-weekly (every 2 weeks)"),
+    ("custom",    "Custom interval"),
+]
+
 ENTRY_REVIEW_STATUS_CHOICES = [
     ("pending",  "Pending"),
     ("approved", "Approved"),
@@ -646,6 +652,27 @@ class Schedule(models.Model):
         choices=SCHEDULE_STATUS_CHOICES,
         default="draft",
         db_index=True,
+    )
+
+    # ── Recurrence ────────────────────────────────────────────────────────────
+    start_date = models.DateField(
+        help_text="Date this schedule begins (first day of service)",
+    )
+    frequency = models.CharField(
+        max_length=20,
+        choices=SCHEDULE_FREQUENCY_CHOICES,
+        default="weekly",
+        help_text="How often the schedule repeats",
+    )
+    custom_interval_weeks = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of weeks between visits (required when frequency is 'Custom')",
+    )
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Optional last date of service. Leave blank for ongoing.",
     )
 
     notes = models.TextField(blank=True, help_text="Optional notes from the client")
@@ -828,3 +855,92 @@ class ScheduleEntry(models.Model):
         from django.core.exceptions import ValidationError
         if self.start_time and self.end_time and self.end_time <= self.start_time:
             raise ValidationError("End time must be after start time.")
+
+    @property
+    def is_fully_approved(self):
+        """True when both the caregiver has approved AND support_person approved (or no support_person)."""
+        cg_ok = self.caregiver_status == "approved"
+        sp_ok = (
+            self.support_person_status == "approved"
+            if self.schedule.support_person_id
+            else True
+        )
+        return cg_ok and sp_ok
+
+
+# ==============================================
+# Schedule Entry Ratings
+# ==============================================
+
+RATER_ROLE_CHOICES = [
+    ("client",    "Client"),
+    ("caregiver", "Caregiver"),
+]
+
+
+class ScheduleEntryRating(models.Model):
+    """
+    Post-session experience rating for a single ScheduleEntry day slot.
+    Both the client and caregiver each submit their own side independently.
+    """
+    schedule_entry = models.ForeignKey(
+        ScheduleEntry,
+        on_delete=models.CASCADE,
+        related_name="ratings",
+    )
+    rater_profile = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.CASCADE,
+        related_name="schedule_ratings_given",
+    )
+    rater_role = models.CharField(
+        max_length=10,
+        choices=RATER_ROLE_CHOICES,
+        help_text="Whether the rater is the client or careworker in this schedule.",
+    )
+    rating_date = models.DateField(
+        help_text="The specific calendar date this session occurred on.",
+    )
+
+    # ── 4 shared metrics (1=Poor, 10=Excellent) ──────────────────────────────
+    care_fit_respect = models.PositiveSmallIntegerField(
+        help_text="1–10. Care Fit & Respect: mutual understanding of needs, preferences, and boundaries.",
+    )
+    communication_coordination = models.PositiveSmallIntegerField(
+        help_text="1–10. Communication & Coordination: clarity, responsiveness, and problem-solving.",
+    )
+    reliability_consistency = models.PositiveSmallIntegerField(
+        help_text="1–10. Reliability & Consistency: attendance, punctuality, and follow-through.",
+    )
+    workload_support_balance = models.PositiveSmallIntegerField(
+        help_text="1–10. Workload & Support Balance: sustainability and appropriate support for all parties.",
+    )
+
+    notes = models.TextField(
+        blank=True,
+        help_text="Optional notes or context for this rating.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-rating_date", "-created_at"]
+        verbose_name = "Schedule Entry Rating"
+        verbose_name_plural = "Schedule Entry Ratings"
+        unique_together = [("schedule_entry", "rater_profile", "rating_date")]
+
+    def __str__(self):
+        return (
+            f"{self.rater_role} rating for entry {self.schedule_entry_id} "
+            f"on {self.rating_date} — avg {self.average:.1f}"
+        )
+
+    @property
+    def average(self):
+        return (
+            self.care_fit_respect
+            + self.communication_coordination
+            + self.reliability_consistency
+            + self.workload_support_balance
+        ) / 4

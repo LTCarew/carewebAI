@@ -4,7 +4,7 @@
 <div class="mb-5">
   <h1 class="title is-2">Client Dashboard</h1>
   {% if client_profile %}
-    <p class="subtitle is-5">Welcome, {{ client_profile.user_profile.display_name }}.</p>
+    <p class="subtitle is-5">Welcome, <a href="{% url 'client_profile' %}">{{ client_profile.user_profile.display_name }}</a>.</p>
   {% endif %}
   <div class="buttons">
     {% comment %} <a href="{% url 'registry_network' %}" class="button is-link">View Careworker Registry</a>
@@ -132,6 +132,11 @@
                     <button type="submit" class="button is-danger is-light is-small">Cancel</button>
                   </form>
                 {% endif %}
+                <form method="post" action="{% url 'schedule_delete' sched.pk %}"
+                      onsubmit="return confirm('Permanently delete this schedule? This cannot be undone.');">
+                  {% csrf_token %}
+                  <button type="submit" class="button is-danger is-small">Delete</button>
+                </form>
               </div>
             </td>
           </tr>

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}My Client Profile{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <div class="level">
+    <div class="level-left">
+      <h1 class="title is-2">My Profile</h1>
+    </div>
+    <div class="level-right">
+      <a href="{% url 'client_dashboard' %}" class="button is-light">← Dashboard</a>
+    </div>
+  </div>
+  <p class="subtitle is-5">{{ user_profile.display_name }}</p>
+</div>
+
+<!-- ══ Section 1: Identity & Contact ══════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">🪪 Identity & Contact</h2></div>
+      <div class="level-right">
+        <a href="{% url 'client_profile_edit_identity' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <p><strong>Name:</strong> {{ user_profile.display_name }}</p>
+        <p><strong>Email:</strong> {{ user_profile.auth_email }}</p>
+        <p><strong>Phone:</strong> {{ user_profile.phone|default:"—" }}</p>
+      </div>
+      <div class="column is-half">
+        <p><strong>Pronouns:</strong> {{ pronouns_display|default:"—" }}</p>
+        <p><strong>Preferred Contact:</strong>
+          {% if contact_prefs_display %}
+            {{ contact_prefs_display|join:", " }}
+          {% else %}—{% endif %}
+        </p>
+        <p><strong>Address:</strong> {{ user_profile.address|default:"—" }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Section 2: Programs & Language ════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">📋 Programs & Language</h2></div>
+      <div class="level-right">
+        <a href="{% url 'client_profile_edit_programs' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <p><strong>Base ZIP Code:</strong> {{ profile.base_zip_code|default:"—" }}</p>
+    <p class="mt-2"><strong>Attendant Care Programs:</strong>
+      {% if programs_display %}{{ programs_display|join:", " }}{% else %}—{% endif %}
+    </p>
+    <p class="mt-2"><strong>Languages Preferred:</strong>
+      {% if languages_display %}{{ languages_display|join:", " }}{% else %}—{% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- ══ Section 3: Availability ═══════════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">📅 Availability</h2></div>
+      <div class="level-right">
+        <a href="{% url 'client_profile_edit_availability' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <p><strong>Schedule Flexible:</strong> {{ profile.schedule_flexibility|yesno:"Yes,No" }}</p>
+        <p><strong>Hours Needed/Week:</strong> {{ profile.hours_per_week|default:"—" }}</p>
+      </div>
+      <div class="column is-half">
+        <strong>Weekly Availability:</strong>
+        {% if profile.availability %}
+          <ul class="mt-1">
+            {% for day, periods in profile.availability.items %}
+              <li><strong>{{ day|title }}:</strong> {{ periods|join:", "|title }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="has-text-grey-light is-italic">Not set.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Section 4: Care Needs & Protocols ════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">🏥 Care Needs & Protocols</h2></div>
+      <div class="level-right">
+        <a href="{% url 'client_profile_edit_care_needs' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <strong>Care Needs:</strong>
+        {% if care_needs_display %}
+          <ul class="mt-1">
+            {% for item in care_needs_display %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="has-text-grey-light is-italic">None listed.</p>
+        {% endif %}
+      </div>
+      <div class="column is-half">
+        <strong>Pathogen Protocol Preferences:</strong>
+        {% if protocols_display %}
+          <ul class="mt-1">
+            {% for item in protocols_display %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="has-text-grey-light is-italic">None listed.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% if profile.additional_care_needs %}
+      <div class="mt-3">
+        <strong>Additional Care Needs:</strong>
+        <p class="ml-3">{{ profile.additional_care_needs|linebreaksbr }}</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

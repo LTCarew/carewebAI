@@ -236,6 +236,7 @@ def make_schedule(client_profile, caregiver_profile, status="draft", match=None,
                 "make_schedule: no organization provided and none exist in the DB. "
                 "Call make_org_admin() before make_schedule()."
             )
+    from datetime import date
     return Schedule.objects.create(
         organization=organization,
         client=client_profile,
@@ -243,6 +244,8 @@ def make_schedule(client_profile, caregiver_profile, status="draft", match=None,
         match=match,
         status=status,
         notes="Test schedule notes",
+        start_date=date.today(),
+        frequency="weekly",
     )
 
 

@@ -5,17 +5,9 @@
 <div class="mb-5">
   <h1 class="title is-2">Support Person Dashboard</h1>
   {% if coordinator_profile %}
-    <p class="subtitle is-5">Welcome, {{ coordinator_profile.user_profile.display_name }}.</p>
+    <p class="subtitle is-5">Welcome, <a href="{% url 'coordinator_profile' %}">{{ coordinator_profile.user_profile.display_name }}</a>.</p>
   {% endif %}
 </div>
-
-{% if messages %}
-  {% for message in messages %}
-    <div class="notification {% if message.tags == 'error' %}is-danger{% elif message.tags == 'warning' %}is-warning{% else %}is-info{% endif %} mb-4">
-      {{ message }}
-    </div>
-  {% endfor %}
-{% endif %}
 
 <!-- Clients I support -->
 {% if client_relationships %}

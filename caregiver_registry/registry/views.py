@@ -352,7 +352,7 @@ def caregiver_dashboard(request):
     unread_notifications = request.user.profile.notifications.filter(is_read=False).order_by("-created_at")[:5]
 
     # Scheduling: entries pending caregiver approval
-    from .models import ScheduleEntry
+    from .models import ScheduleEntry, Schedule
     pending_schedule_entries = list(
         ScheduleEntry.objects.filter(
             schedule__caregiver=caregiver_profile,
@@ -365,6 +365,20 @@ def caregiver_dashboard(request):
         ).order_by("schedule__submitted_at", "day_of_week", "start_time")
     )
 
+    # Scheduling: all schedules assigned to this careworker
+    my_schedules_qs = Schedule.objects.filter(
+        caregiver=caregiver_profile,
+    ).select_related(
+        "client__user_profile",
+        "support_person__user_profile",
+    ).prefetch_related("entries").order_by("-created_at")
+    my_schedules = Paginator(my_schedules_qs, 10).get_page(request.GET.get("schedules_page", 1))
+
+    # Approved schedules only — shown in the expanded entry view at the top
+    approved_schedules = list(
+        my_schedules_qs.filter(status="approved")
+    )
+
     return render(request, "registry/caregiver_dashboard.html", {
         "caregiver_profile": caregiver_profile,
         "pending_my_approval": pending_my_approval,
@@ -373,6 +387,8 @@ def caregiver_dashboard(request):
         "declined_matches": declined_matches,
         "unread_notifications": unread_notifications,
         "pending_schedule_entries": pending_schedule_entries,
+        "my_schedules": my_schedules,
+        "approved_schedules": approved_schedules,
     })
 
 
@@ -1372,15 +1388,20 @@ def schedule_create(request):
             if not valid_entries:
                 messages.error(request, "Please add at least one day/time entry.")
             else:
+                matched = form.cleaned_data["match"]
                 schedule = Schedule.objects.create(
                     organization=organization,
                     client=client_profile,
-                    caregiver=form.cleaned_data["caregiver"],
+                    caregiver=matched.caregiver,
                     support_person=form.cleaned_data.get("support_person"),
-                    match=form.cleaned_data.get("match"),
+                    match=matched,
                     created_by=request.user.profile,
                     status="draft",
                     notes=form.cleaned_data.get("notes", ""),
+                    start_date=form.cleaned_data["start_date"],
+                    frequency=form.cleaned_data["frequency"],
+                    custom_interval_weeks=form.cleaned_data.get("custom_interval_weeks"),
+                    end_date=form.cleaned_data.get("end_date"),
                 )
                 for entry_form in valid_entries:
                     ScheduleEntry.objects.create(
@@ -1500,10 +1521,15 @@ def schedule_edit(request, pk):
             if not valid_entries:
                 messages.error(request, "Please keep at least one day/time entry.")
             else:
-                schedule.caregiver = form.cleaned_data["caregiver"]
+                matched = form.cleaned_data["match"]
+                schedule.caregiver = matched.caregiver
                 schedule.support_person = form.cleaned_data.get("support_person")
-                schedule.match = form.cleaned_data.get("match")
+                schedule.match = matched
                 schedule.notes = form.cleaned_data.get("notes", "")
+                schedule.start_date = form.cleaned_data["start_date"]
+                schedule.frequency = form.cleaned_data["frequency"]
+                schedule.custom_interval_weeks = form.cleaned_data.get("custom_interval_weeks")
+                schedule.end_date = form.cleaned_data.get("end_date")
                 schedule.save()
 
                 # Replace all entries
@@ -1523,6 +1549,10 @@ def schedule_edit(request, pk):
             "support_person": schedule.support_person,
             "match": schedule.match,
             "notes": schedule.notes,
+            "start_date": schedule.start_date,
+            "frequency": schedule.frequency,
+            "custom_interval_weeks": schedule.custom_interval_weeks,
+            "end_date": schedule.end_date,
         }
         form = ScheduleForm(initial=initial_form, client_profile=client_profile)
         initial_entries = [
@@ -1724,6 +1754,35 @@ def schedule_entry_support_respond(request, entry_pk, action):
     return redirect("schedule_detail", pk=entry.schedule.pk)
 
 
+@login_required
+def schedule_delete(request, pk):
+    """
+    Client permanently deletes a schedule (and its entries via cascade).
+    POST only. No status restriction — any schedule owned by this client
+    may be deleted.
+    """
+    from .models import Schedule
+
+    schedule = get_object_or_404(Schedule, pk=pk)
+
+    try:
+        client_profile = request.user.profile.client_profile
+    except Exception:
+        messages.error(request, "Only clients can delete schedules.")
+        return redirect("dashboard_redirect")
+
+    if schedule.client != client_profile:
+        messages.error(request, "You can only delete your own schedules.")
+        return redirect("dashboard_redirect")
+
+    if request.method == "POST":
+        schedule.delete()
+        messages.success(request, "Schedule deleted.")
+        return redirect("client_dashboard")
+
+    return redirect("schedule_detail", pk=pk)
+
+
 # ── Internal helper used by schedule views ───────────────────────────────────
 
 def _is_admin_or_staff(request):
@@ -1733,3 +1792,631 @@ def _is_admin_or_staff(request):
         staff_profile__user_profile=request.user.profile,
         status="active",
     ).exists()
+
+
+# =============================================================================
+# Schedule Entry Rating Views
+# =============================================================================
+
+@login_required
+def schedule_entry_rate(request, entry_pk):
+    """
+    Show + process the Rate Experience form for a single approved ScheduleEntry.
+    Only the schedule's client or caregiver may access this view.
+    The entry must be fully approved before rating is allowed.
+    """
+    from .models import ScheduleEntry, ScheduleEntryRating
+    from .forms import ScheduleEntryRatingForm
+    from django.db.models import Avg
+
+    entry = get_object_or_404(
+        ScheduleEntry.objects.select_related(
+            "schedule__client__user_profile",
+            "schedule__caregiver__user_profile",
+            "schedule__support_person",
+        ),
+        pk=entry_pk,
+    )
+    schedule = entry.schedule
+
+    # ── Determine who is calling ──────────────────────────────────────────────
+    rater_role = None
+    user_profile = request.user.profile
+
+    try:
+        if schedule.client.user_profile == user_profile:
+            rater_role = "client"
+    except Exception:
+        pass
+
+    if rater_role is None:
+        try:
+            if schedule.caregiver.user_profile == user_profile:
+                rater_role = "caregiver"
+        except Exception:
+            pass
+
+    if rater_role is None:
+        messages.error(request, "You do not have permission to rate this entry.")
+        return redirect("schedule_detail", pk=schedule.pk)
+
+    # ── Gate: only fully approved entries can be rated ────────────────────────
+    if not entry.is_fully_approved:
+        messages.warning(
+            request,
+            "This schedule entry must be fully approved before it can be rated."
+        )
+        return redirect("schedule_detail", pk=schedule.pk)
+
+    # ── Existing rating by this user for this entry (if any) for pre-fill ────
+    existing_ratings = ScheduleEntryRating.objects.filter(
+        schedule_entry=entry,
+        rater_profile=user_profile,
+    ).order_by("-rating_date")
+
+    # ── Handle form ───────────────────────────────────────────────────────────
+    if request.method == "POST":
+        form = ScheduleEntryRatingForm(request.POST, entry=entry)
+        if form.is_valid():
+            cd = form.cleaned_data
+            rating, created = ScheduleEntryRating.objects.update_or_create(
+                schedule_entry=entry,
+                rater_profile=user_profile,
+                rating_date=cd["rating_date"],
+                defaults={
+                    "rater_role": rater_role,
+                    "care_fit_respect": cd["care_fit_respect"],
+                    "communication_coordination": cd["communication_coordination"],
+                    "reliability_consistency": cd["reliability_consistency"],
+                    "workload_support_balance": cd["workload_support_balance"],
+                    "notes": cd.get("notes", ""),
+                },
+            )
+            verb = "updated" if not created else "submitted"
+            messages.success(request, f"Rating {verb} for {entry.get_day_of_week_display()}.")
+            return redirect("schedule_detail", pk=schedule.pk)
+    else:
+        form = ScheduleEntryRatingForm(entry=entry)
+
+    # ── Context ───────────────────────────────────────────────────────────────
+    # Counterpart name (show who you're rating with)
+    if rater_role == "client":
+        counterpart_name = schedule.caregiver.user_profile.display_name
+    else:
+        counterpart_name = schedule.client.user_profile.display_name
+
+    return render(request, "registry/schedule_entry_rate.html", {
+        "form": form,
+        "entry": entry,
+        "schedule": schedule,
+        "rater_role": rater_role,
+        "counterpart_name": counterpart_name,
+        "existing_ratings": existing_ratings,
+    })
+
+
+# ── Rating helpers ────────────────────────────────────────────────────────────
+
+def _get_rating_summary(profile, role):
+    """
+    Return average rating data received by a caregiver (rated by clients)
+    or by a client (rated by caregivers).
+    `profile` is a CaregiverProfile or ClientProfile.
+    `role` is "caregiver" or "client".
+    """
+    from .models import ScheduleEntryRating
+    from django.db.models import Avg, F as _F
+
+    # Ratings are submitted *about* a person by the counterpart.
+    # A caregiver's ratings are those submitted by clients about caregiver sessions.
+    # A client's ratings are those submitted by caregivers about client sessions.
+    counterpart_role = "client" if role == "caregiver" else "caregiver"
+
+    if role == "caregiver":
+        qs = ScheduleEntryRating.objects.filter(
+            schedule_entry__schedule__caregiver=profile,
+            rater_role=counterpart_role,
+        )
+    else:
+        qs = ScheduleEntryRating.objects.filter(
+            schedule_entry__schedule__client=profile,
+            rater_role=counterpart_role,
+        )
+
+    agg = qs.aggregate(
+        avg_overall=Avg(
+            (_F("care_fit_respect")
+             + _F("communication_coordination")
+             + _F("reliability_consistency")
+             + _F("workload_support_balance")) / 4.0
+        ),
+        avg_care_fit=Avg("care_fit_respect"),
+        avg_communication=Avg("communication_coordination"),
+        avg_reliability=Avg("reliability_consistency"),
+        avg_workload=Avg("workload_support_balance"),
+    )
+    return {
+        "count": qs.count(),
+        **agg,
+    }
+
+
+@login_required
+def caregiver_ratings_detail(request, pk):
+    """
+    Staff-only: Full ratings history received by a specific careworker.
+    pk is CaregiverProfile.pk.
+    """
+    from .models import CaregiverProfile, ScheduleEntryRating
+
+    unauthorized = _redirect_if_not_admin_staff(request)
+    if unauthorized:
+        return unauthorized
+
+    caregiver_profile = get_object_or_404(CaregiverProfile.objects.select_related("user_profile"), pk=pk)
+
+    ratings_qs = ScheduleEntryRating.objects.filter(
+        schedule_entry__schedule__caregiver=caregiver_profile,
+        rater_role="client",
+    ).select_related(
+        "schedule_entry__schedule__client__user_profile",
+        "rater_profile",
+    ).order_by("-rating_date")
+
+    paginator = Paginator(ratings_qs, 20)
+    page = paginator.get_page(request.GET.get("page", 1))
+
+    summary = _get_rating_summary(caregiver_profile, "caregiver")
+
+    return render(request, "registry/caregiver_ratings_detail.html", {
+        "caregiver_profile": caregiver_profile,
+        "ratings": page,
+        "summary": summary,
+    })
+
+
+@login_required
+def client_ratings_detail(request, pk):
+    """
+    Staff-only: Full ratings history received by a specific client.
+    pk is ClientProfile.pk.
+    """
+    from .models import ClientProfile, ScheduleEntryRating
+
+    unauthorized = _redirect_if_not_admin_staff(request)
+    if unauthorized:
+        return unauthorized
+
+    client_profile = get_object_or_404(ClientProfile.objects.select_related("user_profile"), pk=pk)
+
+    ratings_qs = ScheduleEntryRating.objects.filter(
+        schedule_entry__schedule__client=client_profile,
+        rater_role="caregiver",
+    ).select_related(
+        "schedule_entry__schedule__caregiver__user_profile",
+        "rater_profile",
+    ).order_by("-rating_date")
+
+    paginator = Paginator(ratings_qs, 20)
+    page = paginator.get_page(request.GET.get("page", 1))
+
+    summary = _get_rating_summary(client_profile, "client")
+
+    return render(request, "registry/client_ratings_detail.html", {
+        "client_profile": client_profile,
+        "ratings": page,
+        "summary": summary,
+    })
+
+
+# ==============================================
+# Self-Service Profile View & Edit Views
+# ==============================================
+
+def _resolve_choices(keys, choices_list):
+    """Convert a list of stored choice keys → their human-readable labels."""
+    mapping = dict(choices_list)
+    return [mapping.get(k, k) for k in (keys or [])]
+
+
+def _availability_initial(availability_dict):
+    """Build the `initial` dict for availability form fields from a stored JSON dict."""
+    from .forms import DAYS
+    return {f"{day}_periods": availability_dict.get(day, []) for day in DAYS}
+
+
+# ── Careworker ────────────────────────────────────────────────────────────────
+
+@login_required
+def caregiver_profile_view(request):
+    """Show the logged-in careworker's own profile with Edit buttons per section."""
+    from .models import CaregiverProfile
+    from .models import (
+        TRANSPORTATION_CHOICES, EXPERIENCE_CHOICES, LANGUAGE_CHOICES,
+        PATHOGEN_PROTOCOL_CHOICES, ATTENDANT_PROGRAM_CHOICES,
+        HOURS_LOOKING_FOR_CHOICES, RATE_CHOICES,
+    )
+
+    profile = get_object_or_404(CaregiverProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+    up = profile.user_profile
+
+    return render(request, "registry/profile/caregiver_profile.html", {
+        "profile": profile,
+        "user_profile": up,
+        "transportation_display": _resolve_choices(profile.transportation, TRANSPORTATION_CHOICES),
+        "experience_display": _resolve_choices(profile.experience_with, EXPERIENCE_CHOICES),
+        "languages_display": _resolve_choices(profile.languages_spoken, LANGUAGE_CHOICES),
+        "protocols_display": _resolve_choices(profile.pathogen_protocols, PATHOGEN_PROTOCOL_CHOICES),
+        "programs_display": _resolve_choices(profile.attendant_care_programs, ATTENDANT_PROGRAM_CHOICES),
+        "hours_display": dict(HOURS_LOOKING_FOR_CHOICES).get(profile.hours_looking_for, profile.hours_looking_for),
+        "rate_display": dict(RATE_CHOICES).get(profile.rate, profile.rate),
+        "contact_prefs_display": _resolve_choices(up.contact_preferences, [("phone","Phone"),("email","Email"),("text","Text Message"),("any","Any")]),
+        "pronouns_display": dict([("she_her","She/Her"),("he_him","He/Him"),("they_them","They/Them"),("she_they","She/They"),("he_they","He/They"),("ze_zir","Ze/Zir"),("ask_me","Ask Me"),("self_describe","Self Describe")]).get(up.pronouns, up.pronouns),
+    })
+
+
+@login_required
+def caregiver_profile_edit_identity(request):
+    from .models import CaregiverProfile
+    from .forms import IdentityEditForm
+
+    profile = get_object_or_404(CaregiverProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+    up = profile.user_profile
+
+    if request.method == "POST":
+        form = IdentityEditForm(request.POST)
+        if form.is_valid():
+            form.save(up)
+            messages.success(request, "Identity & contact info updated.")
+            return redirect("caregiver_profile")
+    else:
+        form = IdentityEditForm(initial={
+            "first_name": up.user.first_name,
+            "last_name": up.user.last_name,
+            "phone": up.phone,
+            "pronouns": up.pronouns,
+            "contact_preferences": up.contact_preferences,
+            "address": up.address,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Identity & Contact",
+        "back_url_name": "caregiver_profile",
+    })
+
+
+@login_required
+def caregiver_profile_edit_location(request):
+    from .models import CaregiverProfile
+    from .forms import CaregiverLocationEditForm
+
+    profile = get_object_or_404(CaregiverProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+
+    if request.method == "POST":
+        form = CaregiverLocationEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Location & transportation updated.")
+            return redirect("caregiver_profile")
+    else:
+        form = CaregiverLocationEditForm(initial={
+            "base_zip_code": profile.base_zip_code,
+            "willing_to_work_cities": ", ".join(profile.willing_to_work_cities or []),
+            "transportation": profile.transportation,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Location & Transportation",
+        "back_url_name": "caregiver_profile",
+    })
+
+
+@login_required
+def caregiver_profile_edit_availability(request):
+    from .models import CaregiverProfile
+    from .forms import CaregiverAvailabilityEditForm
+
+    profile = get_object_or_404(CaregiverProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+
+    if request.method == "POST":
+        form = CaregiverAvailabilityEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Availability & rates updated.")
+            return redirect("caregiver_profile")
+    else:
+        initial = _availability_initial(profile.availability)
+        initial.update({
+            "hours_looking_for": profile.hours_looking_for,
+            "desired_hours_per_week": profile.desired_hours_per_week,
+            "rate": profile.rate,
+            "attendant_care_programs": profile.attendant_care_programs,
+        })
+        form = CaregiverAvailabilityEditForm(initial=initial)
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Availability & Hours",
+        "back_url_name": "caregiver_profile",
+    })
+
+
+@login_required
+def caregiver_profile_edit_experience(request):
+    from .models import CaregiverProfile
+    from .forms import CaregiverExperienceEditForm
+
+    profile = get_object_or_404(CaregiverProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+
+    if request.method == "POST":
+        form = CaregiverExperienceEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Experience & skills updated.")
+            return redirect("caregiver_profile")
+    else:
+        form = CaregiverExperienceEditForm(initial={
+            "experience_with": profile.experience_with,
+            "languages_spoken": profile.languages_spoken,
+            "pathogen_protocols": profile.pathogen_protocols,
+            "certified_ihss_worker": profile.certified_ihss_worker,
+            "additional_certifications": profile.additional_certifications,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Experience & Skills",
+        "back_url_name": "caregiver_profile",
+    })
+
+
+@login_required
+def caregiver_profile_edit_notes(request):
+    from .models import CaregiverProfile
+    from .forms import CaregiverNotesEditForm
+
+    profile = get_object_or_404(CaregiverProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+
+    if request.method == "POST":
+        form = CaregiverNotesEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Profile notes updated.")
+            return redirect("caregiver_profile")
+    else:
+        form = CaregiverNotesEditForm(initial={
+            "bio": profile.bio,
+            "wants_training_updates": profile.wants_training_updates,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Profile Notes",
+        "back_url_name": "caregiver_profile",
+    })
+
+
+# ── Client ────────────────────────────────────────────────────────────────────
+
+@login_required
+def client_profile_view(request):
+    """Show the logged-in client's own profile with Edit buttons per section."""
+    from .models import ClientProfile
+    from .models import (
+        ATTENDANT_PROGRAM_CHOICES, LANGUAGE_CHOICES,
+        CARE_NEEDS_CHOICES, PATHOGEN_PROTOCOL_CHOICES,
+    )
+
+    profile = get_object_or_404(ClientProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+    up = profile.user_profile
+
+    return render(request, "registry/profile/client_profile.html", {
+        "profile": profile,
+        "user_profile": up,
+        "programs_display": _resolve_choices(profile.attendant_care_programs, ATTENDANT_PROGRAM_CHOICES),
+        "languages_display": _resolve_choices(profile.languages_preferred, LANGUAGE_CHOICES),
+        "care_needs_display": _resolve_choices(profile.care_needs, CARE_NEEDS_CHOICES),
+        "protocols_display": _resolve_choices(profile.pathogen_protocol_preferences, PATHOGEN_PROTOCOL_CHOICES),
+        "contact_prefs_display": _resolve_choices(up.contact_preferences, [("phone","Phone"),("email","Email"),("text","Text Message"),("any","Any")]),
+        "pronouns_display": dict([("she_her","She/Her"),("he_him","He/Him"),("they_them","They/Them"),("she_they","She/They"),("he_they","He/They"),("ze_zir","Ze/Zir"),("ask_me","Ask Me"),("self_describe","Self Describe")]).get(up.pronouns, up.pronouns),
+    })
+
+
+@login_required
+def client_profile_edit_identity(request):
+    from .models import ClientProfile
+    from .forms import IdentityEditForm
+
+    profile = get_object_or_404(ClientProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+    up = profile.user_profile
+
+    if request.method == "POST":
+        form = IdentityEditForm(request.POST)
+        if form.is_valid():
+            form.save(up)
+            messages.success(request, "Identity & contact info updated.")
+            return redirect("client_profile")
+    else:
+        form = IdentityEditForm(initial={
+            "first_name": up.user.first_name,
+            "last_name": up.user.last_name,
+            "phone": up.phone,
+            "pronouns": up.pronouns,
+            "contact_preferences": up.contact_preferences,
+            "address": up.address,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Identity & Contact",
+        "back_url_name": "client_profile",
+    })
+
+
+@login_required
+def client_profile_edit_programs(request):
+    from .models import ClientProfile
+    from .forms import ClientProgramsEditForm
+
+    profile = get_object_or_404(ClientProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+
+    if request.method == "POST":
+        form = ClientProgramsEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Programs & language preferences updated.")
+            return redirect("client_profile")
+    else:
+        form = ClientProgramsEditForm(initial={
+            "base_zip_code": profile.base_zip_code,
+            "attendant_care_programs": profile.attendant_care_programs,
+            "languages_preferred": profile.languages_preferred,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Programs & Language",
+        "back_url_name": "client_profile",
+    })
+
+
+@login_required
+def client_profile_edit_availability(request):
+    from .models import ClientProfile
+    from .forms import ClientAvailabilityEditForm
+
+    profile = get_object_or_404(ClientProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+
+    if request.method == "POST":
+        form = ClientAvailabilityEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Availability updated.")
+            return redirect("client_profile")
+    else:
+        initial = _availability_initial(profile.availability)
+        initial.update({
+            "schedule_flexibility": profile.schedule_flexibility,
+            "hours_per_week": profile.hours_per_week,
+        })
+        form = ClientAvailabilityEditForm(initial=initial)
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Availability",
+        "back_url_name": "client_profile",
+    })
+
+
+@login_required
+def client_profile_edit_care_needs(request):
+    from .models import ClientProfile
+    from .forms import ClientCareNeedsEditForm
+
+    profile = get_object_or_404(ClientProfile.objects.select_related("user_profile__user"), user_profile__user=request.user)
+
+    if request.method == "POST":
+        form = ClientCareNeedsEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Care needs updated.")
+            return redirect("client_profile")
+    else:
+        form = ClientCareNeedsEditForm(initial={
+            "care_needs": profile.care_needs,
+            "additional_care_needs": profile.additional_care_needs,
+            "pathogen_protocol_preferences": profile.pathogen_protocol_preferences,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Care Needs & Protocols",
+        "back_url_name": "client_profile",
+    })
+
+
+# ── Support Coordinator ───────────────────────────────────────────────────────
+
+@login_required
+def coordinator_profile_view(request):
+    """Show the logged-in support coordinator's own profile with Edit buttons per section."""
+    from .models import SupportCoordinatorProfile
+
+    profile = get_object_or_404(
+        SupportCoordinatorProfile.objects.select_related("user_profile__user"),
+        user_profile__user=request.user,
+    )
+    up = profile.user_profile
+
+    return render(request, "registry/profile/coordinator_profile.html", {
+        "profile": profile,
+        "user_profile": up,
+        "contact_prefs_display": _resolve_choices(up.contact_preferences, [("phone","Phone"),("email","Email"),("text","Text Message"),("any","Any")]),
+        "pronouns_display": dict([("she_her","She/Her"),("he_him","He/Him"),("they_them","They/Them"),("she_they","She/They"),("he_they","He/They"),("ze_zir","Ze/Zir"),("ask_me","Ask Me"),("self_describe","Self Describe")]).get(up.pronouns, up.pronouns),
+    })
+
+
+@login_required
+def coordinator_profile_edit_identity(request):
+    from .models import SupportCoordinatorProfile
+    from .forms import IdentityEditForm
+
+    profile = get_object_or_404(
+        SupportCoordinatorProfile.objects.select_related("user_profile__user"),
+        user_profile__user=request.user,
+    )
+    up = profile.user_profile
+
+    if request.method == "POST":
+        form = IdentityEditForm(request.POST)
+        if form.is_valid():
+            form.save(up)
+            messages.success(request, "Identity & contact info updated.")
+            return redirect("coordinator_profile")
+    else:
+        form = IdentityEditForm(initial={
+            "first_name": up.user.first_name,
+            "last_name": up.user.last_name,
+            "phone": up.phone,
+            "pronouns": up.pronouns,
+            "contact_preferences": up.contact_preferences,
+            "address": up.address,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Identity & Contact",
+        "back_url_name": "coordinator_profile",
+    })
+
+
+@login_required
+def coordinator_profile_edit_info(request):
+    from .models import SupportCoordinatorProfile
+    from .forms import CoordinatorInfoEditForm
+
+    profile = get_object_or_404(
+        SupportCoordinatorProfile.objects.select_related("user_profile__user"),
+        user_profile__user=request.user,
+    )
+
+    if request.method == "POST":
+        form = CoordinatorInfoEditForm(request.POST)
+        if form.is_valid():
+            form.save(profile)
+            messages.success(request, "Coordinator info updated.")
+            return redirect("coordinator_profile")
+    else:
+        form = CoordinatorInfoEditForm(initial={
+            "relationship_to_clients": profile.relationship_to_clients,
+            "credentials": profile.credentials,
+            "certifications": profile.certifications,
+        })
+
+    return render(request, "registry/profile/profile_edit_form.html", {
+        "form": form,
+        "section_title": "Edit Coordinator Info",
+        "back_url_name": "coordinator_profile",
+    })

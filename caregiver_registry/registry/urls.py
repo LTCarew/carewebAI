@@ -187,6 +187,11 @@ urlpatterns = [
         name="schedule_cancel",
     ),
     path(
+        "schedules/<int:pk>/delete/",
+        views.schedule_delete,
+        name="schedule_delete",
+    ),
+    path(
         "schedule-entries/<int:entry_pk>/caregiver/<str:action>/",
         views.schedule_entry_caregiver_respond,
         name="schedule_entry_caregiver_respond",
@@ -196,6 +201,39 @@ urlpatterns = [
         views.schedule_entry_support_respond,
         name="schedule_entry_support_respond",
     ),
+    path(
+        "schedule-entries/<int:entry_pk>/rate/",
+        views.schedule_entry_rate,
+        name="schedule_entry_rate",
+    ),
+    path(
+        "dashboard/org/caregivers/<int:pk>/ratings/",
+        views.caregiver_ratings_detail,
+        name="caregiver_ratings_detail",
+    ),
+    path(
+        "dashboard/org/clients/<int:pk>/ratings/",
+        views.client_ratings_detail,
+        name="client_ratings_detail",
+    ),
+
+    # ── Self-Service Profile Pages ────────────────────────────────────────────
+    path("profile/caregiver/",                        views.caregiver_profile_view,             name="caregiver_profile"),
+    path("profile/caregiver/edit/identity/",          views.caregiver_profile_edit_identity,    name="caregiver_profile_edit_identity"),
+    path("profile/caregiver/edit/location/",          views.caregiver_profile_edit_location,    name="caregiver_profile_edit_location"),
+    path("profile/caregiver/edit/availability/",      views.caregiver_profile_edit_availability,name="caregiver_profile_edit_availability"),
+    path("profile/caregiver/edit/experience/",        views.caregiver_profile_edit_experience,  name="caregiver_profile_edit_experience"),
+    path("profile/caregiver/edit/notes/",             views.caregiver_profile_edit_notes,       name="caregiver_profile_edit_notes"),
+
+    path("profile/client/",                           views.client_profile_view,                name="client_profile"),
+    path("profile/client/edit/identity/",             views.client_profile_edit_identity,       name="client_profile_edit_identity"),
+    path("profile/client/edit/programs/",             views.client_profile_edit_programs,       name="client_profile_edit_programs"),
+    path("profile/client/edit/availability/",         views.client_profile_edit_availability,   name="client_profile_edit_availability"),
+    path("profile/client/edit/care-needs/",           views.client_profile_edit_care_needs,     name="client_profile_edit_care_needs"),
+
+    path("profile/coordinator/",                      views.coordinator_profile_view,           name="coordinator_profile"),
+    path("profile/coordinator/edit/identity/",        views.coordinator_profile_edit_identity,  name="coordinator_profile_edit_identity"),
+    path("profile/coordinator/edit/info/",            views.coordinator_profile_edit_info,      name="coordinator_profile_edit_info"),
 
     # ── Staff Invite URLs ─────────────────────────────────────────────────────
     path(

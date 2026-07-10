@@ -25,25 +25,93 @@
     <form method="post">
       {% csrf_token %}
 
-      <h2 class="title is-5 mb-3">Schedule Details</h2>
-
-      {% for field in form %}
-        <div class="field mb-4">
-          <label class="label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-          <div class="control">
-            {{ field }}
-          </div>
-          {% if field.help_text %}
-            <p class="help">{{ field.help_text }}</p>
-          {% endif %}
-          {% for error in field.errors %}
-            <p class="help is-danger">{{ error }}</p>
-          {% endfor %}
+      {% if form.non_field_errors %}
+        <div class="notification is-danger is-light mb-4">
+          {% for err in form.non_field_errors %}<p>{{ err }}</p>{% endfor %}
         </div>
-      {% endfor %}
+      {% endif %}
+
+      <!-- ── People ───────────────────────────────────────────────── -->
+      <h2 class="title is-5 mb-3">People</h2>
+
+      {# Active Match — the careworker is determined automatically from the match #}
+      <div class="field mb-4">
+        <label class="label" for="{{ form.match.id_for_label }}">{{ form.match.label }}</label>
+        <div class="control">
+          <div class="select is-fullwidth">{{ form.match }}</div>
+        </div>
+        {% if form.match.help_text %}<p class="help">{{ form.match.help_text }}</p>{% endif %}
+        {% for error in form.match.errors %}<p class="help is-danger">{{ error }}</p>{% endfor %}
+      </div>
+
+      {# Support Coordinator (optional) #}
+      <div class="field mb-4">
+        <label class="label" for="{{ form.support_person.id_for_label }}">{{ form.support_person.label }}</label>
+        <div class="control">
+          <div class="select is-fullwidth">{{ form.support_person }}</div>
+        </div>
+        {% if form.support_person.help_text %}<p class="help">{{ form.support_person.help_text }}</p>{% endif %}
+        {% for error in form.support_person.errors %}<p class="help is-danger">{{ error }}</p>{% endfor %}
+      </div>
 
       <hr>
 
+      <!-- ── Recurrence ────────────────────────────────────────────── -->
+      <h2 class="title is-5 mb-3">Schedule Recurrence</h2>
+
+      <div class="columns">
+        <div class="column is-half">
+          <div class="field">
+            <label class="label" for="{{ form.start_date.id_for_label }}">{{ form.start_date.label }}</label>
+            <div class="control">{{ form.start_date }}</div>
+            {% if form.start_date.help_text %}<p class="help">{{ form.start_date.help_text }}</p>{% endif %}
+            {% for err in form.start_date.errors %}<p class="help is-danger">{{ err }}</p>{% endfor %}
+          </div>
+        </div>
+        <div class="column is-half">
+          <div class="field">
+            <label class="label" for="{{ form.end_date.id_for_label }}">{{ form.end_date.label }}</label>
+            <div class="control">{{ form.end_date }}</div>
+            {% if form.end_date.help_text %}<p class="help">{{ form.end_date.help_text }}</p>{% endif %}
+            {% for err in form.end_date.errors %}<p class="help is-danger">{{ err }}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="columns">
+        <div class="column is-half">
+          <div class="field">
+            <label class="label" for="{{ form.frequency.id_for_label }}">{{ form.frequency.label }}</label>
+            <div class="control">
+              <div class="select is-fullwidth">{{ form.frequency }}</div>
+            </div>
+            {% if form.frequency.help_text %}<p class="help">{{ form.frequency.help_text }}</p>{% endif %}
+            {% for err in form.frequency.errors %}<p class="help is-danger">{{ err }}</p>{% endfor %}
+          </div>
+        </div>
+        <div class="column is-half" id="custom-interval-field" style="display:none;">
+          <div class="field">
+            <label class="label" for="{{ form.custom_interval_weeks.id_for_label }}">{{ form.custom_interval_weeks.label }}</label>
+            <div class="control">{{ form.custom_interval_weeks }}</div>
+            {% if form.custom_interval_weeks.help_text %}<p class="help">{{ form.custom_interval_weeks.help_text }}</p>{% endif %}
+            {% for err in form.custom_interval_weeks.errors %}<p class="help is-danger">{{ err }}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <hr>
+
+      <!-- ── Notes ────────────────────────────────────────────────── -->
+      <div class="field mb-4">
+        <label class="label" for="{{ form.notes.id_for_label }}">{{ form.notes.label }}</label>
+        <div class="control">{{ form.notes }}</div>
+        {% if form.notes.help_text %}<p class="help">{{ form.notes.help_text }}</p>{% endif %}
+        {% for err in form.notes.errors %}<p class="help is-danger">{{ err }}</p>{% endfor %}
+      </div>
+
+      <hr>
+
+      <!-- ── Day / Time Entries ─────────────────────────────────── -->
       <h2 class="title is-5 mb-3">Day / Time Entries</h2>
       <p class="is-size-7 has-text-grey mb-3">
         Add one or more recurring days and times. Each entry will require individual approval from
@@ -101,6 +169,44 @@
         {% endfor %}
       </div>
 
+      <!-- + Add Day button -->
+      <div class="mb-4 has-text-right">
+        <button type="button" id="add-day-btn" class="button is-link is-light is-small">
+          + Add Day
+        </button>
+      </div>
+
+      <!-- Hidden empty-form template for JS cloning -->
+      <div id="empty-entry-template" style="display:none;">
+        <div class="box mb-3 entry-row">
+          <div class="columns is-vcentered">
+            <div class="column is-4">
+              <div class="field">
+                <label class="label">{{ formset.empty_form.day_of_week.label }}</label>
+                <div class="control">{{ formset.empty_form.day_of_week }}</div>
+              </div>
+            </div>
+            <div class="column is-3">
+              <div class="field">
+                <label class="label">{{ formset.empty_form.start_time.label }}</label>
+                <div class="control">{{ formset.empty_form.start_time }}</div>
+              </div>
+            </div>
+            <div class="column is-3">
+              <div class="field">
+                <label class="label">{{ formset.empty_form.end_time.label }}</label>
+                <div class="control">{{ formset.empty_form.end_time }}</div>
+              </div>
+            </div>
+            <div class="column is-2">
+              <div class="field mt-4">
+                <button type="button" class="button is-danger is-light is-small remove-row-btn">✕ Remove</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="buttons mt-4">
         <button type="submit" class="button is-primary">
           {% if action == "create" %}Save Draft{% else %}Save Changes{% endif %}
@@ -116,4 +222,54 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    // ── Frequency custom-interval toggle ────────────────────────────────────
+    const freqSelect = document.getElementById("id_frequency");
+    const customField = document.getElementById("custom-interval-field");
+
+    function toggleCustom() {
+      if (freqSelect && customField) {
+        customField.style.display = freqSelect.value === "custom" ? "" : "none";
+      }
+    }
+
+    if (freqSelect) {
+      freqSelect.addEventListener("change", toggleCustom);
+      toggleCustom();
+    }
+
+    // ── Dynamic formset rows (+ Add Day) ────────────────────────────────────
+    const addBtn      = document.getElementById("add-day-btn");
+    const formset     = document.getElementById("entry-formset");
+    const emptyTpl    = document.getElementById("empty-entry-template");
+    const totalFormsInput = document.getElementById("id_entries-TOTAL_FORMS");
+
+    if (addBtn && formset && emptyTpl && totalFormsInput) {
+      addBtn.addEventListener("click", function () {
+        const currentCount = parseInt(totalFormsInput.value, 10);
+
+        // Clone the hidden template and replace the __prefix__ placeholder
+        const newRow = emptyTpl.firstElementChild.cloneNode(true);
+        newRow.innerHTML = newRow.innerHTML.replace(/__prefix__/g, currentCount);
+
+        // Wire up the Remove button
+        const removeBtn = newRow.querySelector(".remove-row-btn");
+        if (removeBtn) {
+          removeBtn.addEventListener("click", function () {
+            newRow.remove();
+            // Decrement TOTAL_FORMS when a freshly-added row is removed before submit
+            totalFormsInput.value = parseInt(totalFormsInput.value, 10) - 1;
+          });
+        }
+
+        formset.appendChild(newRow);
+        totalFormsInput.value = currentCount + 1;
+      });
+    }
+  })();
+</script>
 {% endblock %}

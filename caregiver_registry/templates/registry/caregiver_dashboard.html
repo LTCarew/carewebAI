@@ -5,13 +5,9 @@
 {% block content %}
 <div class="mb-5">
   <h1 class="title is-2">Careworker Dashboard</h1>
-  {% if caregiver_profile %}
-    <p class="subtitle is-5">Welcome, {{ caregiver_profile.user_profile.display_name }}.</p>
+{% if caregiver_profile %}
+    <p class="subtitle is-5">Welcome, <a href="{% url 'caregiver_profile' %}">{{ caregiver_profile.user_profile.display_name }}</a>.</p>
   {% endif %}
-  {% comment %} <div class="buttons">
-    <a href="{% url 'registry_network' %}" class="button is-link">View Clients</a>
-    <a href="{% url 'ai_match_caregiver' %}" class="button is-info">✨ AI Assisted Match</a>
-  </div> {% endcomment %}
 </div>
 
 {% if unread_notifications %}
@@ -22,6 +18,186 @@
   {% endfor %}
 </div>
 {% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  APPROVED SCHEDULE — entries view (mirrors client schedule table)     -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left">
+        <h2 class="title is-5">✅ My Approved Schedule</h2>
+      </div>
+    </div>
+
+    {% for sched in approved_schedules %}
+      <!-- One card per approved schedule -->
+      <div class="box mb-4" style="border-left: 4px solid #48c78e;">
+        <div class="level is-mobile mb-2">
+          <div class="level-left">
+            <div>
+              <p class="has-text-weight-semibold">
+                Person Receiving Support:
+                <a href="{% url 'schedule_detail' sched.pk %}">
+                  {{ sched.client.user_profile.display_name }}
+                </a>
+              </p>
+              <p class="is-size-7 has-text-grey">
+                Starts {{ sched.start_date|date:"N j, Y" }}
+                {% if sched.end_date %} &mdash; ends {{ sched.end_date|date:"N j, Y" }}{% else %} (ongoing){% endif %}
+                &nbsp;&middot;&nbsp; {{ sched.get_frequency_display }}
+                {% if sched.support_person %}
+                  &nbsp;&middot;&nbsp; Support: {{ sched.support_person.user_profile.display_name }}
+                {% endif %}
+              </p>
+            </div>
+          </div>
+          <div class="level-right">
+            <a href="{% url 'schedule_detail' sched.pk %}" class="button is-success is-light is-small">
+              View Details
+            </a>
+          </div>
+        </div>
+
+        <!-- Entry table for this approved schedule -->
+        <div class="table-container" role="region" aria-label="Approved schedule entries for {{ sched.client.user_profile.display_name }}">
+          <table class="table is-fullwidth is-striped is-hoverable is-narrow">
+            <thead>
+              <tr>
+                <th scope="col">Day</th>
+                <th scope="col">Start</th>
+                <th scope="col">End</th>
+                <th scope="col">Your Status</th>
+                {% if sched.support_person %}
+                  <th scope="col">Support Person Status</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in sched.entries.all %}
+              <tr>
+                <td><strong>{{ entry.get_day_of_week_display }}</strong></td>
+                <td>{{ entry.start_time|time:"g:i A" }}</td>
+                <td>{{ entry.end_time|time:"g:i A" }}</td>
+                <td>
+                  {% if entry.caregiver_status == "approved" %}
+                    <span class="tag is-success is-light">Approved</span>
+                  {% elif entry.caregiver_status == "rejected" %}
+                    <span class="tag is-danger is-light">Rejected</span>
+                  {% else %}
+                    <span class="tag is-warning is-light">Pending</span>
+                  {% endif %}
+                </td>
+                {% if sched.support_person %}
+                <td>
+                  {% if entry.support_person_status == "approved" %}
+                    <span class="tag is-success is-light">Approved</span>
+                  {% elif entry.support_person_status == "rejected" %}
+                    <span class="tag is-danger is-light">Rejected</span>
+                  {% else %}
+                    <span class="tag is-warning is-light">Pending</span>
+                  {% endif %}
+                </td>
+                {% endif %}
+              </tr>
+              {% empty %}
+                <tr><td colspan="5" class="has-text-grey-light is-italic">No entries.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% empty %}
+      <p class="has-text-grey-light is-italic">
+        No approved schedules yet. Schedules become approved once you and your support person
+        (if assigned) have approved all entries.
+      </p>
+    {% endfor %}
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  ALL SCHEDULES — full table (mirrors client dashboard)                -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">📅 All My Schedules</h2>
+    {% if my_schedules %}
+    <div class="table-container" role="region" aria-label="All schedules">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Person Receiving Support</th>
+            <th scope="col">Support Person</th>
+            <th scope="col">Status</th>
+            <th scope="col">Frequency</th>
+            <th scope="col">Start Date</th>
+            <th scope="col">Submitted</th>
+            <th scope="col">Entries</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sched in my_schedules %}
+          <tr {% if sched.status == "approved" %}class="has-background-success-light"{% endif %}>
+            <td>
+              <a href="{% url 'schedule_detail' sched.pk %}">
+                {{ sched.client.user_profile.display_name }}
+              </a>
+            </td>
+            <td>
+              {% if sched.support_person %}
+                {{ sched.support_person.user_profile.display_name }}
+              {% else %}
+                <span class="has-text-grey-light">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sched.status == "approved" %}
+                <span class="tag is-success is-light">Approved</span>
+              {% elif sched.status == "rejected" %}
+                <span class="tag is-danger is-light">Rejected</span>
+              {% elif sched.status == "cancelled" %}
+                <span class="tag is-light">Cancelled</span>
+              {% elif sched.status == "partially_approved" %}
+                <span class="tag is-warning is-light">Partially Approved</span>
+              {% elif sched.status == "submitted" %}
+                <span class="tag is-info is-light">Submitted</span>
+              {% else %}
+                <span class="tag is-warning is-light">Draft</span>
+              {% endif %}
+            </td>
+            <td class="is-size-7">{{ sched.get_frequency_display }}</td>
+            <td>{{ sched.start_date|date:"N j, Y" }}</td>
+            <td>
+              {% if sched.submitted_at %}
+                {{ sched.submitted_at|date:"N j, Y" }}
+              {% else %}
+                <span class="has-text-grey-light">—</span>
+              {% endif %}
+            </td>
+            <td>{{ sched.entries.count }}</td>
+            <td>
+              <div class="buttons are-small">
+                <a href="{% url 'schedule_detail' sched.pk %}" class="button is-light is-small">View</a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/_pagination.html" with page_obj=my_schedules page_param="schedules_page" %}
+    {% else %}
+      <p class="has-text-grey-light is-italic">No schedules assigned to you yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  MATCH TABLES                                                          -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
 
 <!-- Pending My Approval -->
 <div class="card app-card mb-4">
@@ -63,10 +239,12 @@
   </div>
 </div>
 
-<!-- Schedule Requests -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  PENDING SCHEDULE APPROVALS                                            -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
 <div class="card app-card mb-4">
   <div class="card-content">
-    <h2 class="title is-5">📅 Schedule Requests</h2>
+    <h2 class="title is-5">⏰ Pending Schedule Approvals</h2>
     {% if pending_schedule_entries %}
     <div class="table-container" role="region" aria-label="Pending schedule entries for careworker">
       <table class="table is-fullwidth is-striped is-hoverable">
@@ -113,7 +291,7 @@
                   {% csrf_token %}
                   <button type="submit"
                           class="button is-success is-small"
-                          aria-label="Approve {{ entry.get_day_of_week_display }} {{ entry.start_time|time:'g:i A' }} to {{ entry.end_time|time:'g:i A' }} for {{ entry.schedule.client.user_profile.display_name }}">
+                          aria-label="Approve {{ entry.get_day_of_week_display }} for {{ entry.schedule.client.user_profile.display_name }}">
                     Approve
                   </button>
                 </form>
@@ -122,7 +300,7 @@
                   {% csrf_token %}
                   <button type="submit"
                           class="button is-danger is-small"
-                          aria-label="Reject {{ entry.get_day_of_week_display }} {{ entry.start_time|time:'g:i A' }} to {{ entry.end_time|time:'g:i A' }} for {{ entry.schedule.client.user_profile.display_name }}">
+                          aria-label="Reject {{ entry.get_day_of_week_display }} for {{ entry.schedule.client.user_profile.display_name }}">
                     Reject
                   </button>
                 </form>

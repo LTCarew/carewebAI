@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}My Careworker Profile{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <div class="level">
+    <div class="level-left">
+      <h1 class="title is-2">My Profile</h1>
+    </div>
+    <div class="level-right">
+      <a href="{% url 'caregiver_dashboard' %}" class="button is-light">← Dashboard</a>
+    </div>
+  </div>
+  <p class="subtitle is-5">{{ user_profile.display_name }}</p>
+</div>
+
+<!-- ══ Section 1: Identity & Contact ══════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">🪪 Identity & Contact</h2></div>
+      <div class="level-right">
+        <a href="{% url 'caregiver_profile_edit_identity' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <p><strong>Name:</strong> {{ user_profile.display_name }}</p>
+        <p><strong>Email:</strong> {{ user_profile.auth_email }}</p>
+        <p><strong>Phone:</strong> {{ user_profile.phone|default:"—" }}</p>
+      </div>
+      <div class="column is-half">
+        <p><strong>Pronouns:</strong> {{ pronouns_display|default:"—" }}</p>
+        <p><strong>Preferred Contact:</strong>
+          {% if contact_prefs_display %}
+            {{ contact_prefs_display|join:", " }}
+          {% else %}—{% endif %}
+        </p>
+        <p><strong>Address:</strong> {{ user_profile.address|default:"—" }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Section 2: Location & Transportation ═══════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">📍 Location & Transportation</h2></div>
+      <div class="level-right">
+        <a href="{% url 'caregiver_profile_edit_location' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <p><strong>Base ZIP Code:</strong> {{ profile.base_zip_code|default:"—" }}</p>
+    <p><strong>Willing to Work In:</strong>
+      {% if profile.willing_to_work_cities %}
+        {{ profile.willing_to_work_cities|join:", " }}
+      {% else %}—{% endif %}
+    </p>
+    <p class="mt-2"><strong>Transportation:</strong>
+      {% if transportation_display %}
+        <ul class="mt-1">
+          {% for item in transportation_display %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}—{% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- ══ Section 3: Availability & Hours ════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">📅 Availability & Hours</h2></div>
+      <div class="level-right">
+        <a href="{% url 'caregiver_profile_edit_availability' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <p><strong>Hours Looking For:</strong> {{ hours_display|default:"—" }}</p>
+        <p><strong>Desired Hours/Week:</strong> {{ profile.desired_hours_per_week|default:"—" }}</p>
+        <p><strong>Hourly Rate:</strong> {{ rate_display|default:"—" }}</p>
+        <p class="mt-2"><strong>Programs:</strong>
+          {% if programs_display %}{{ programs_display|join:", " }}{% else %}—{% endif %}
+        </p>
+      </div>
+      <div class="column is-half">
+        <strong>Weekly Availability:</strong>
+        {% if profile.availability %}
+          <ul class="mt-1">
+            {% for day, periods in profile.availability.items %}
+              <li><strong>{{ day|title }}:</strong> {{ periods|join:", "|title }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="has-text-grey-light is-italic">Not set.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Section 4: Experience & Skills ════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">🛠️ Experience & Skills</h2></div>
+      <div class="level-right">
+        <a href="{% url 'caregiver_profile_edit_experience' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <div class="columns is-multiline">
+      <div class="column is-half">
+        <p><strong>IHSS Certified:</strong> {{ profile.certified_ihss_worker|yesno:"Yes,No" }}</p>
+        <p><strong>Additional Certifications:</strong> {{ profile.additional_certifications|default:"—" }}</p>
+        <p class="mt-2"><strong>Languages Spoken:</strong>
+          {% if languages_display %}{{ languages_display|join:", " }}{% else %}—{% endif %}
+        </p>
+      </div>
+      <div class="column is-half">
+        <strong>Experience With:</strong>
+        {% if experience_display %}
+          <ul class="mt-1">
+            {% for item in experience_display %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="has-text-grey-light is-italic">None listed.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="mt-3">
+      <strong>Pathogen Safety Protocols:</strong>
+      {% if protocols_display %}
+        <ul class="mt-1">
+          {% for item in protocols_display %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="has-text-grey-light is-italic">None listed.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ══ Section 5: Profile Notes ══════════════════════════════════════════ -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left"><h2 class="title is-5 mb-0">📝 Profile Notes</h2></div>
+      <div class="level-right">
+        <a href="{% url 'caregiver_profile_edit_notes' %}" class="button is-link is-light is-small">Edit</a>
+      </div>
+    </div>
+    <p><strong>Bio:</strong></p>
+    <p class="ml-3">{{ profile.bio|default:"No bio yet."|linebreaksbr }}</p>
+    <p class="mt-3"><strong>Wants Training Updates:</strong> {{ profile.wants_training_updates|yesno:"Yes,No" }}</p>
+  </div>
+</div>
+
+{% endblock %}

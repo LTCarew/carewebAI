@@ -553,26 +553,52 @@ class CoordinatorSignupForm(forms.Form):
 class ScheduleForm(forms.Form):
     """
     Form for a client to create or edit a draft Schedule.
-    Caregiver is chosen from the client's active matches.
-    Support person is chosen from the client's active coordinators (optional).
+    Match is required and determines the careworker automatically.
+    Support coordinator is chosen from the client's active coordinators (optional).
     """
-    caregiver = forms.ModelChoiceField(
+    match = forms.ModelChoiceField(
         queryset=None,  # set in __init__
-        label="Careworker",
-        help_text="Select the careworker from one of your active matches",
+        required=True,
+        label="Active Match",
+        help_text="Select the active match this schedule is for (this also sets the careworker)",
     )
     support_person = forms.ModelChoiceField(
         queryset=None,  # set in __init__
         required=False,
-        label="Support Person",
-        help_text="Optionally select a support person to co-approve this schedule",
+        label="Support Coordinator",
+        help_text="Optionally select a support coordinator to co-approve this schedule",
     )
-    match = forms.ModelChoiceField(
-        queryset=None,  # set in __init__
+
+    # ── Recurrence fields ─────────────────────────────────────────────────────
+    start_date = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Start Date",
+        help_text="First date that care is scheduled to begin",
+    )
+    frequency = forms.ChoiceField(
+        choices=[
+            ("weekly",   "Weekly"),
+            ("biweekly", "Bi-weekly (every 2 weeks)"),
+            ("custom",   "Custom interval"),
+        ],
+        label="Frequency",
+        initial="weekly",
+        help_text="How often these visits repeat",
+    )
+    custom_interval_weeks = forms.IntegerField(
         required=False,
-        label="Linked Match",
-        help_text="Select the active match this schedule is for",
+        min_value=1,
+        max_value=52,
+        label="Repeat every N weeks",
+        help_text="Required when frequency is 'Custom'. Enter the number of weeks between visits.",
     )
+    end_date = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        required=False,
+        label="End Date (optional)",
+        help_text="Last date of service. Leave blank for ongoing care.",
+    )
+
     notes = forms.CharField(
         widget=forms.Textarea(attrs={"rows": 3}),
         required=False,
@@ -582,25 +608,22 @@ class ScheduleForm(forms.Form):
 
     def __init__(self, *args, client_profile=None, **kwargs):
         super().__init__(*args, **kwargs)
-        from .models import CaregiverProfile, SupportCoordinatorProfile, ClientCoordinator
+        from .models import SupportCoordinatorProfile, ClientCoordinator
         from matching.models import Match
 
         if client_profile is not None:
-            # Active matches for this client
+            # Active matches for this client — selecting a match determines the careworker
             active_matches = Match.objects.filter(
                 client=client_profile,
                 status="active",
             ).select_related("caregiver__user_profile")
 
-            caregiver_ids = active_matches.values_list("caregiver_id", flat=True)
-            self.fields["caregiver"].queryset = CaregiverProfile.objects.filter(
-                id__in=caregiver_ids
-            ).select_related("user_profile")
-            self.fields["caregiver"].label_from_instance = (
-                lambda obj: obj.user_profile.display_name
+            self.fields["match"].queryset = active_matches
+            self.fields["match"].label_from_instance = (
+                lambda obj: f"Match with {obj.caregiver.user_profile.display_name}"
             )
 
-            # Active coordinators for this client
+            # Active support coordinators for this client
             active_coordinator_ids = ClientCoordinator.objects.filter(
                 client_profile=client_profile,
                 status="active",
@@ -612,21 +635,29 @@ class ScheduleForm(forms.Form):
             self.fields["support_person"].label_from_instance = (
                 lambda obj: obj.user_profile.display_name
             )
-
-            # Active matches as FK link
-            self.fields["match"].queryset = active_matches
-            self.fields["match"].label_from_instance = (
-                lambda obj: f"Match with {obj.caregiver.user_profile.display_name}"
-            )
         else:
-            from .models import CaregiverProfile, SupportCoordinatorProfile
-            self.fields["caregiver"].queryset = CaregiverProfile.objects.none()
+            self.fields["match"].queryset = Match.objects.none()
             self.fields["support_person"].queryset = SupportCoordinatorProfile.objects.none()
-            self.fields["match"].queryset = __import__(
-                "matching.models", fromlist=["Match"]
-            ).Match.objects.none()
 
         apply_bulma_classes(self)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        frequency = cleaned_data.get("frequency")
+        interval = cleaned_data.get("custom_interval_weeks")
+        start = cleaned_data.get("start_date")
+        end = cleaned_data.get("end_date")
+
+        if frequency == "custom" and not interval:
+            self.add_error(
+                "custom_interval_weeks",
+                "Please enter the number of weeks between visits for a custom frequency."
+            )
+
+        if start and end and end <= start:
+            self.add_error("end_date", "End date must be after start date.")
+
+        return cleaned_data
 
 
 class ScheduleEntryForm(forms.Form):
@@ -682,3 +713,378 @@ class ScheduleEntryReviewForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_bulma_classes(self)
+
+
+# ==============================================
+# Schedule Entry Rating Form
+# ==============================================
+
+_SLIDER_ATTRS = {"type": "range", "min": "1", "max": "10", "step": "1", "class": "slider is-fullwidth"}
+
+
+class ScheduleEntryRatingForm(forms.Form):
+    """
+    Form for submitting an experience rating for a single approved ScheduleEntry.
+    Available to the schedule's client OR caregiver.
+
+    rating_date is validated against the entry's day_of_week — if the calendar
+    date falls on a different weekday the form raises a 'Wrong date' error.
+    """
+    rating_date = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "input"}),
+        label="Date of session",
+        help_text="Select the exact calendar date this session took place.",
+    )
+
+    care_fit_respect = forms.IntegerField(
+        min_value=1, max_value=10,
+        widget=forms.NumberInput(attrs={**_SLIDER_ATTRS, "id": "id_care_fit_respect"}),
+        label="Care Fit & Respect",
+        help_text='"Do we have a good understanding of each other\'s needs, preferences, boundaries, and expectations?"',
+        initial=5,
+    )
+    communication_coordination = forms.IntegerField(
+        min_value=1, max_value=10,
+        widget=forms.NumberInput(attrs={**_SLIDER_ATTRS, "id": "id_communication_coordination"}),
+        label="Communication & Coordination",
+        help_text='"Are we communicating clearly and responding to each other in a way that supports the care relationship?"',
+        initial=5,
+    )
+    reliability_consistency = forms.IntegerField(
+        min_value=1, max_value=10,
+        widget=forms.NumberInput(attrs={**_SLIDER_ATTRS, "id": "id_reliability_consistency"}),
+        label="Reliability & Consistency",
+        help_text='"Is the care arrangement happening consistently and predictably as expected?"',
+        initial=5,
+    )
+    workload_support_balance = forms.IntegerField(
+        min_value=1, max_value=10,
+        widget=forms.NumberInput(attrs={**_SLIDER_ATTRS, "id": "id_workload_support_balance"}),
+        label="Workload & Support Balance",
+        help_text='"Does this care arrangement feel sustainable and appropriately supported for everyone involved?"',
+        initial=5,
+    )
+
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3, "class": "textarea"}),
+        required=False,
+        label="Notes (optional)",
+        help_text="Any additional context about this session.",
+    )
+
+    # day_of_week string (e.g. "monday") injected by the view, not a visible field
+    def __init__(self, *args, entry=None, **kwargs):
+        self._entry = entry
+        super().__init__(*args, **kwargs)
+
+    def clean_rating_date(self):
+        rating_date = self.cleaned_data.get("rating_date")
+        if rating_date is None or self._entry is None:
+            return rating_date
+
+        # Python weekday(): Monday=0 … Sunday=6
+        _WEEKDAY_MAP = {
+            "monday": 0, "tuesday": 1, "wednesday": 2,
+            "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
+        }
+        expected_weekday = _WEEKDAY_MAP.get(self._entry.day_of_week)
+        actual_weekday = rating_date.weekday()
+
+        if expected_weekday is not None and actual_weekday != expected_weekday:
+            actual_name = rating_date.strftime("%A")  # e.g. "Tuesday"
+            expected_name = self._entry.get_day_of_week_display()
+            raise forms.ValidationError(
+                f"Wrong date: {rating_date} falls on a {actual_name}, "
+                f"but this schedule row is for {expected_name}."
+            )
+        return rating_date
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Profile Self-Edit Forms  (one per section)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class IdentityEditForm(forms.Form):
+    """Update first/last name (auth.User) and contact info (UserProfile).
+    Used by caregiver, client, and coordinator profile edit pages."""
+
+    first_name = forms.CharField(max_length=150, label="First Name")
+    last_name = forms.CharField(max_length=150, label="Last Name")
+    phone = forms.CharField(max_length=25, required=False, label="Phone")
+    pronouns = forms.ChoiceField(
+        choices=[("", "Prefer not to say")] + list(PRONOUN_CHOICES),
+        required=False,
+        label="Pronouns",
+    )
+    contact_preferences = forms.MultipleChoiceField(
+        choices=CONTACT_PREFERENCES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Preferred Contact Methods",
+    )
+    address = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Address",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def save(self, user_profile):
+        data = self.cleaned_data
+        user = user_profile.user
+        user.first_name = data["first_name"]
+        user.last_name = data["last_name"]
+        user.save(update_fields=["first_name", "last_name"])
+        user_profile.phone = data.get("phone", "")
+        user_profile.pronouns = data.get("pronouns", "")
+        user_profile.contact_preferences = data.get("contact_preferences") or []
+        user_profile.address = data.get("address", "")
+        user_profile.save()
+
+
+class CaregiverLocationEditForm(forms.Form):
+    """Edit careworker location and transportation options."""
+
+    base_zip_code = forms.CharField(max_length=10, label="Base ZIP Code")
+    willing_to_work_cities = forms.CharField(
+        required=False,
+        label="Willing to Work In",
+        widget=forms.TextInput(attrs={"placeholder": "e.g. Oakland, Berkeley, Emeryville"}),
+        help_text="Separate multiple cities with commas.",
+    )
+    transportation = forms.MultipleChoiceField(
+        choices=TRANSPORTATION_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Transportation",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def save(self, caregiver_profile):
+        data = self.cleaned_data
+        caregiver_profile.base_zip_code = data["base_zip_code"]
+        raw = data.get("willing_to_work_cities", "")
+        caregiver_profile.willing_to_work_cities = [c.strip() for c in raw.split(",") if c.strip()]
+        caregiver_profile.transportation = data.get("transportation") or []
+        caregiver_profile.save()
+
+
+class CaregiverAvailabilityEditForm(AvailabilityMixin, forms.Form):
+    """Edit careworker availability, hours, rate, and programs."""
+
+    hours_looking_for = forms.ChoiceField(
+        choices=HOURS_LOOKING_FOR_CHOICES,
+        label="Hours Looking For",
+    )
+    desired_hours_per_week = forms.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=168,
+        label="Desired Hours per Week",
+    )
+    rate = forms.ChoiceField(choices=RATE_CHOICES, label="Hourly Rate")
+    attendant_care_programs = forms.MultipleChoiceField(
+        choices=ATTENDANT_PROGRAM_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Attendant Care Programs",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_availability_fields()
+        apply_bulma_classes(self)
+
+    def save(self, caregiver_profile):
+        data = self.cleaned_data
+        caregiver_profile.availability = self.build_availability_json()
+        caregiver_profile.hours_looking_for = data["hours_looking_for"]
+        caregiver_profile.desired_hours_per_week = data.get("desired_hours_per_week")
+        caregiver_profile.rate = data["rate"]
+        caregiver_profile.attendant_care_programs = data.get("attendant_care_programs") or []
+        caregiver_profile.save()
+
+
+class CaregiverExperienceEditForm(forms.Form):
+    """Edit careworker experience, languages, and pathogen protocols."""
+
+    experience_with = forms.MultipleChoiceField(
+        choices=EXPERIENCE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Experience With",
+    )
+    languages_spoken = forms.MultipleChoiceField(
+        choices=LANGUAGE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Languages Spoken",
+    )
+    pathogen_protocols = forms.MultipleChoiceField(
+        choices=PATHOGEN_PROTOCOL_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Pathogen Safety Protocols",
+    )
+    certified_ihss_worker = forms.BooleanField(required=False, label="IHSS Certified Worker")
+    additional_certifications = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Additional Certifications",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def save(self, caregiver_profile):
+        data = self.cleaned_data
+        caregiver_profile.experience_with = data.get("experience_with") or []
+        caregiver_profile.languages_spoken = data.get("languages_spoken") or []
+        caregiver_profile.pathogen_protocols = data.get("pathogen_protocols") or []
+        caregiver_profile.certified_ihss_worker = data.get("certified_ihss_worker", False)
+        caregiver_profile.additional_certifications = data.get("additional_certifications", "")
+        caregiver_profile.save()
+
+
+class CaregiverNotesEditForm(forms.Form):
+    """Edit careworker bio and training preferences."""
+
+    bio = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 5}),
+        required=False,
+        label="Bio / About Me",
+    )
+    wants_training_updates = forms.BooleanField(required=False, label="I want to receive training updates")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def save(self, caregiver_profile):
+        data = self.cleaned_data
+        caregiver_profile.bio = data.get("bio", "")
+        caregiver_profile.wants_training_updates = data.get("wants_training_updates", False)
+        caregiver_profile.save()
+
+
+class ClientProgramsEditForm(forms.Form):
+    """Edit client location, programs, and language preferences."""
+
+    base_zip_code = forms.CharField(max_length=10, label="Base ZIP Code")
+    attendant_care_programs = forms.MultipleChoiceField(
+        choices=ATTENDANT_PROGRAM_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Attendant Care Programs",
+    )
+    languages_preferred = forms.MultipleChoiceField(
+        choices=LANGUAGE_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Languages Preferred",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def save(self, client_profile):
+        data = self.cleaned_data
+        client_profile.base_zip_code = data["base_zip_code"]
+        client_profile.attendant_care_programs = data.get("attendant_care_programs") or []
+        client_profile.languages_preferred = data.get("languages_preferred") or []
+        client_profile.save()
+
+
+class ClientAvailabilityEditForm(AvailabilityMixin, forms.Form):
+    """Edit client availability and scheduling preferences."""
+
+    schedule_flexibility = forms.BooleanField(required=False, label="My schedule is flexible")
+    hours_per_week = forms.IntegerField(
+        required=False,
+        min_value=1,
+        label="Hours Needed per Week",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.add_availability_fields()
+        apply_bulma_classes(self)
+
+    def save(self, client_profile):
+        data = self.cleaned_data
+        client_profile.availability = self.build_availability_json()
+        client_profile.schedule_flexibility = data.get("schedule_flexibility", False)
+        client_profile.hours_per_week = data.get("hours_per_week")
+        client_profile.save()
+
+
+class ClientCareNeedsEditForm(forms.Form):
+    """Edit client care needs and pathogen protocol preferences."""
+
+    care_needs = forms.MultipleChoiceField(
+        choices=CARE_NEEDS_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Care Needs",
+    )
+    additional_care_needs = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Additional Care Needs",
+    )
+    pathogen_protocol_preferences = forms.MultipleChoiceField(
+        choices=PATHOGEN_PROTOCOL_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Pathogen Protocol Preferences",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def save(self, client_profile):
+        data = self.cleaned_data
+        client_profile.care_needs = data.get("care_needs") or []
+        client_profile.additional_care_needs = data.get("additional_care_needs", "")
+        client_profile.pathogen_protocol_preferences = data.get("pathogen_protocol_preferences") or []
+        client_profile.save()
+
+
+class CoordinatorInfoEditForm(forms.Form):
+    """Edit support coordinator professional information."""
+
+    relationship_to_clients = forms.CharField(
+        max_length=100,
+        label="Relationship to Clients",
+        help_text="E.g., Family member, Agency representative, Friend, etc.",
+    )
+    credentials = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Professional Credentials",
+    )
+    certifications = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Certifications",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        apply_bulma_classes(self)
+
+    def save(self, coordinator_profile):
+        data = self.cleaned_data
+        coordinator_profile.relationship_to_clients = data["relationship_to_clients"]
+        coordinator_profile.credentials = data.get("credentials", "")
+        coordinator_profile.certifications = data.get("certifications", "")
+        coordinator_profile.save()

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}{{ section_title }}{% endblock %}
+
+{% block content %}
+<div class="mb-5">
+  <h1 class="title is-3">{{ section_title }}</h1>
+  <a href="{% url back_url_name %}" class="button is-light is-small">← Back to Profile</a>
+</div>
+
+<div class="card app-card">
+  <div class="card-content">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="notification is-danger mb-4">
+          {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+        </div>
+      {% endif %}
+
+      {% for field in form %}
+        <div class="field mb-4">
+          <label class="label" for="{{ field.id_for_label }}">
+            {{ field.label }}
+            {% if field.field.required %}<span class="has-text-danger">*</span>{% endif %}
+          </label>
+
+          {% if field.field.widget.input_type == "checkbox" and field.field.widget.allow_multiple_selected %}
+            {# CheckboxSelectMultiple — render inline #}
+            <div class="control">
+              {% for cb in field %}
+                <label class="checkbox mr-3">{{ cb.tag }} {{ cb.choice_label }}</label>
+              {% endfor %}
+            </div>
+          {% elif field.field.widget.input_type == "checkbox" %}
+            {# Single BooleanField #}
+            <div class="control">
+              <label class="checkbox">{{ field }} {{ field.label }}</label>
+            </div>
+          {% else %}
+            <div class="control">
+              {{ field }}
+            </div>
+          {% endif %}
+
+          {% if field.help_text %}
+            <p class="help">{{ field.help_text }}</p>
+          {% endif %}
+
+          {% for err in field.errors %}
+            <p class="help is-danger">{{ err }}</p>
+          {% endfor %}
+        </div>
+      {% endfor %}
+
+      <div class="field is-grouped mt-5">
+        <div class="control">
+          <button type="submit" class="button is-link">Save Changes</button>
+        </div>
+        <div class="control">
+          <a href="{% url back_url_name %}" class="button is-light">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

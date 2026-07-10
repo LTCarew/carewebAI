@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Rate Experience — {{ entry.get_day_of_week_display }}{% endblock %}
+
+{% block content %}
+<div class="level mb-4">
+  <div class="level-left">
+    <div>
+      <h1 class="title is-3">⭐ Rate Your Experience</h1>
+      <p class="subtitle is-6 mb-0">
+        {{ entry.get_day_of_week_display }} &mdash;
+        {{ entry.start_time|time:"g:i A" }} to {{ entry.end_time|time:"g:i A" }}
+        &nbsp;&middot;&nbsp;
+        {% if rater_role == "client" %}Session with <strong>{{ counterpart_name }}</strong> (Careworker)
+        {% else %}Session with <strong>{{ counterpart_name }}</strong> (Client)
+        {% endif %}
+      </p>
+    </div>
+  </div>
+  <div class="level-right">
+    <a href="{% url 'schedule_detail' schedule.pk %}" class="button is-light">← Back to Schedule</a>
+  </div>
+</div>
+
+<!-- Rating Form -->
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <h2 class="title is-5 mb-4">Submit a Rating</h2>
+
+    <div class="notification is-info is-light mb-5">
+      <p class="is-size-7">
+        Rate on a scale of <strong>1 (Poor)</strong> to <strong>10 (Excellent)</strong>.
+        Both you and <strong>{{ counterpart_name }}</strong> answer the same questions
+        independently about the same session. Averages appear in the registry table.
+      </p>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <!-- Date Field -->
+      <div class="field mb-5">
+        <label class="label" for="id_rating_date">
+          {{ form.fields.rating_date.label }} <span class="has-text-danger">*</span>
+        </label>
+        <div class="control">
+          {{ form.rating_date }}
+        </div>
+        {% if form.rating_date.errors %}
+          {% for err in form.rating_date.errors %}<p class="help is-danger">{{ err }}</p>{% endfor %}
+        {% else %}
+          <p class="help">{{ form.fields.rating_date.help_text }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Metric Sliders -->
+      {% for slider_id, slider_field, slider_widget in slider_fields %}{% endfor %}
+
+      <!-- Care Fit & Respect -->
+      <div class="field mb-6">
+        <label class="label" for="id_care_fit_respect">
+          {{ form.fields.care_fit_respect.label }}
+        </label>
+        <p class="is-size-7 has-text-grey mb-3">{{ form.fields.care_fit_respect.help_text }}</p>
+        <div class="columns is-vcentered is-mobile">
+          <div class="column is-narrow"><span class="tag is-danger is-light is-small">1 Poor</span></div>
+          <div class="column">{{ form.care_fit_respect }}</div>
+          <div class="column is-narrow"><span class="tag is-success is-light is-small">10 Excellent</span></div>
+        </div>
+        <div class="has-text-centered mt-1">
+          <span class="tag is-info is-medium" id="val-id_care_fit_respect">5</span>
+        </div>
+        {% if form.care_fit_respect.errors %}<p class="help is-danger">{{ form.care_fit_respect.errors|join:", " }}</p>{% endif %}
+      </div>
+
+      <!-- Communication & Coordination -->
+      <div class="field mb-6">
+        <label class="label" for="id_communication_coordination">
+          {{ form.fields.communication_coordination.label }}
+        </label>
+        <p class="is-size-7 has-text-grey mb-3">{{ form.fields.communication_coordination.help_text }}</p>
+        <div class="columns is-vcentered is-mobile">
+          <div class="column is-narrow"><span class="tag is-danger is-light is-small">1 Poor</span></div>
+          <div class="column">{{ form.communication_coordination }}</div>
+          <div class="column is-narrow"><span class="tag is-success is-light is-small">10 Excellent</span></div>
+        </div>
+        <div class="has-text-centered mt-1">
+          <span class="tag is-info is-medium" id="val-id_communication_coordination">5</span>
+        </div>
+        {% if form.communication_coordination.errors %}<p class="help is-danger">{{ form.communication_coordination.errors|join:", " }}</p>{% endif %}
+      </div>
+
+      <!-- Reliability & Consistency -->
+      <div class="field mb-6">
+        <label class="label" for="id_reliability_consistency">
+          {{ form.fields.reliability_consistency.label }}
+        </label>
+        <p class="is-size-7 has-text-grey mb-3">{{ form.fields.reliability_consistency.help_text }}</p>
+        <div class="columns is-vcentered is-mobile">
+          <div class="column is-narrow"><span class="tag is-danger is-light is-small">1 Poor</span></div>
+          <div class="column">{{ form.reliability_consistency }}</div>
+          <div class="column is-narrow"><span class="tag is-success is-light is-small">10 Excellent</span></div>
+        </div>
+        <div class="has-text-centered mt-1">
+          <span class="tag is-info is-medium" id="val-id_reliability_consistency">5</span>
+        </div>
+        {% if form.reliability_consistency.errors %}<p class="help is-danger">{{ form.reliability_consistency.errors|join:", " }}</p>{% endif %}
+      </div>
+
+      <!-- Workload & Support Balance -->
+      <div class="field mb-6">
+        <label class="label" for="id_workload_support_balance">
+          {{ form.fields.workload_support_balance.label }}
+        </label>
+        <p class="is-size-7 has-text-grey mb-3">{{ form.fields.workload_support_balance.help_text }}</p>
+        <div class="columns is-vcentered is-mobile">
+          <div class="column is-narrow"><span class="tag is-danger is-light is-small">1 Poor</span></div>
+          <div class="column">{{ form.workload_support_balance }}</div>
+          <div class="column is-narrow"><span class="tag is-success is-light is-small">10 Excellent</span></div>
+        </div>
+        <div class="has-text-centered mt-1">
+          <span class="tag is-info is-medium" id="val-id_workload_support_balance">5</span>
+        </div>
+        {% if form.workload_support_balance.errors %}<p class="help is-danger">{{ form.workload_support_balance.errors|join:", " }}</p>{% endif %}
+      </div>
+
+      <!-- Notes -->
+      <div class="field mt-5">
+        <label class="label" for="id_notes">{{ form.fields.notes.label }}</label>
+        {{ form.notes }}
+        <p class="help">{{ form.fields.notes.help_text }}</p>
+        {% if form.notes.errors %}<p class="help is-danger">{{ form.notes.errors|join:", " }}</p>{% endif %}
+      </div>
+
+      <!-- Submit -->
+      <div class="field mt-5">
+        <div class="buttons">
+          <button type="submit" class="button is-primary">Submit Rating</button>
+          <a href="{% url 'schedule_detail' schedule.pk %}" class="button is-light">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Past Ratings by This User for This Entry -->
+{% if existing_ratings %}
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <h2 class="title is-5">📋 Your Past Ratings for This Day</h2>
+    <p class="is-size-7 has-text-grey mb-3">
+      Submitting a rating for a date you have already rated will update the existing record.
+    </p>
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable is-size-7">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Care Fit</th>
+            <th>Communication</th>
+            <th>Reliability</th>
+            <th>Workload</th>
+            <th>Avg</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in existing_ratings %}
+          <tr>
+            <td>{{ r.rating_date|date:"N j, Y" }}</td>
+            <td><span class="tag is-light">{{ r.care_fit_respect }}</span></td>
+            <td><span class="tag is-light">{{ r.communication_coordination }}</span></td>
+            <td><span class="tag is-light">{{ r.reliability_consistency }}</span></td>
+            <td><span class="tag is-light">{{ r.workload_support_balance }}</span></td>
+            <td>
+              {% with avg=r.average %}
+                {% if avg >= 7.5 %}<span class="tag is-success is-light">{{ avg|floatformat:1 }}</span>
+                {% elif avg >= 5 %}<span class="tag is-warning is-light">{{ avg|floatformat:1 }}</span>
+                {% else %}<span class="tag is-danger is-light">{{ avg|floatformat:1 }}</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td>{{ r.notes|default:"—"|truncatewords:10 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  var sliders = [
+    "id_care_fit_respect",
+    "id_communication_coordination",
+    "id_reliability_consistency",
+    "id_workload_support_balance",
+  ];
+  sliders.forEach(function (id) {
+    var el  = document.getElementById(id);
+    var lbl = document.getElementById("val-" + id);
+    if (!el || !lbl) return;
+    function update() {
+      var v = parseInt(el.value, 10);
+      lbl.textContent = v;
+      lbl.className = "tag is-medium " + (v >= 8 ? "is-success" : v >= 5 ? "is-info" : "is-danger");
+    }
+    update();
+    el.addEventListener("input", update);
+  });
+})();
+</script>
+{% endblock %}

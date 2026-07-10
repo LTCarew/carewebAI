@@ -334,11 +334,11 @@
       <div class="level-left">
         <h2 class="title is-4">👤 Staff Members</h2>
       </div>
-      <div class="level-right">
+      {% comment %} <div class="level-right">
         {% if can_invite_staff %}
         <a href="{% url 'staff_invite_send' %}" class="button is-link is-small">✉️ Invite Staff</a>
         {% endif %}
-      </div>
+      </div> {% endcomment %}
     </div>
 
     {% if staff_members %}

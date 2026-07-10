@@ -43,7 +43,7 @@
     <div class="container">
         {% if messages %}
             {% for message in messages %}
-                <div class="notification is-info">
+                <div class="notification {% if message.tags == 'error' %}is-danger{% elif message.tags == 'warning' %}is-warning{% elif message.tags == 'success' %}is-success{% else %}is-info{% endif %} mb-2">
                     {{ message }}
                 </div>
             {% endfor %}

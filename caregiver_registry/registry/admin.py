@@ -11,6 +11,7 @@ from .models import (
     Invite,
     Schedule,
     ScheduleEntry,
+    ScheduleEntryRating,
 )
 
 
@@ -146,11 +147,17 @@ class ScheduleEntryInline(admin.TabularInline):
 
 @admin.register(Schedule)
 class ScheduleAdmin(admin.ModelAdmin):
-    list_display = ("pk", "client", "caregiver", "support_person", "status", "submitted_at", "created_at")
-    list_filter = ("status", "organization")
+    list_display  = ("pk", "client", "caregiver", "status", "start_date", "frequency", "end_date", "organization", "created_at")
+    list_filter   = ("status", "frequency", "organization")
     search_fields = ("client__user_profile__user__last_name", "caregiver__user_profile__user__last_name")
-    readonly_fields = ("created_at", "updated_at", "submitted_at", "cancelled_at")
+    readonly_fields = ("created_at", "submitted_at", "cancelled_at")
     inlines = [ScheduleEntryInline]
+    fieldsets = (
+        ("People", {"fields": ("organization", "client", "caregiver", "support_person", "match", "created_by")}),
+        ("Recurrence", {"fields": ("start_date", "frequency", "custom_interval_weeks", "end_date")}),
+        ("Status & Notes", {"fields": ("status", "notes")}),
+        ("Timestamps", {"fields": ("created_at", "submitted_at", "cancelled_at"), "classes": ("collapse",)}),
+    )
 
 
 @admin.register(ScheduleEntry)
@@ -158,3 +165,25 @@ class ScheduleEntryAdmin(admin.ModelAdmin):
     list_display = ("schedule", "day_of_week", "start_time", "end_time", "caregiver_status", "support_person_status")
     list_filter = ("caregiver_status", "support_person_status", "day_of_week")
     readonly_fields = ("created_at", "updated_at", "caregiver_reviewed_at", "support_person_reviewed_at")
+
+
+@admin.register(ScheduleEntryRating)
+class ScheduleEntryRatingAdmin(admin.ModelAdmin):
+    list_display = (
+        "schedule_entry",
+        "rater_role",
+        "rater_profile",
+        "rating_date",
+        "care_fit_respect",
+        "communication_coordination",
+        "reliability_consistency",
+        "workload_support_balance",
+        "created_at",
+    )
+    list_filter = ("rater_role", "rating_date")
+    search_fields = (
+        "schedule_entry__schedule__client__user_profile__user__last_name",
+        "schedule_entry__schedule__caregiver__user_profile__user__last_name",
+        "rater_profile__user__last_name",
+    )
+    readonly_fields = ("created_at", "updated_at")

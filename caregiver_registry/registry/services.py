@@ -591,3 +591,78 @@ def user_is_admin_or_staff(user):
         pass
     
     return False
+
+
+# ==============================================
+# Staff Invite Service
+# ==============================================
+
+def send_staff_invite(organization, email, role, invited_by_user,
+                      can_approve_applications=False, can_invite_staff=False):
+    """
+    Create an OrganizationStaffInvite and send the invitation email.
+
+    Args:
+        organization:            Organization instance
+        email:                   Email address of the invited person
+        role:                    'staff' or 'admin'
+        invited_by_user:         User instance who is sending the invite
+        can_approve_applications: permission flag
+        can_invite_staff:        permission flag
+
+    Returns:
+        OrganizationStaffInvite instance
+    """
+    from organizations.models import OrganizationStaffInvite
+    from django.core.mail import send_mail
+    from django.conf import settings
+    from django.urls import reverse
+
+    # Attach permissions to the invite so the signup view can read them
+    invite = OrganizationStaffInvite.objects.create(
+        organization=organization,
+        email=email.lower(),
+        role=role,
+        can_approve_applications=can_approve_applications,
+        can_invite_staff=can_invite_staff,
+        invited_by=invited_by_user.profile,
+    )
+
+    signup_url = (
+        f"{settings.SITE_URL}"
+        f"{reverse('staff_signup', kwargs={'token': invite.token})}"
+    )
+
+    role_display = "Administrator" if role == "admin" else "Staff"
+    subject = (
+        f"Invitation to join {organization.name} as {role_display} — CareWeb AI"
+    )
+    message = f"""Hello,
+
+{invited_by_user.get_full_name() or invited_by_user.username} has invited you to join
+{organization.name} as a {role_display} on CareWeb AI.
+
+As {role_display}, you will have access to the organization dashboard where you can
+manage caregiver and client applications.
+
+To accept this invitation and create your account, please click the link below:
+
+{signup_url}
+
+This invitation will expire in 7 days.
+
+If you did not expect this invitation, you can safely ignore this email.
+
+Best regards,
+The CareWeb AI Team
+""".strip()
+
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+
+    return invite

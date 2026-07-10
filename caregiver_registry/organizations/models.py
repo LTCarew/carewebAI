@@ -129,11 +129,37 @@ class OrganizationStaffInvite(models.Model):
         unique=True
     )
 
+    # Permissions to carry over to OrganizationStaff on acceptance
+    can_approve_applications = models.BooleanField(default=False)
+    can_invite_staff = models.BooleanField(default=False)
+
+    # Who sent this invite
+    invited_by = models.ForeignKey(
+        "accounts.UserProfile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="staff_invites_sent_by",
+    )
+
     accepted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(
         default=default_staff_invite_expiration
     )
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["token"], name="org_staff_invite_token_idx"),
+            models.Index(fields=["organization", "email"], name="org_staff_invite_org_email_idx"),
+        ]
+
     def __str__(self):
         return f"{self.email} invited to {self.organization}"
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def is_valid(self):
+        """Return True if the invite can still be used."""
+        return not self.accepted and not self.is_expired()

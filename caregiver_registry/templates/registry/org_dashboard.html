@@ -5,14 +5,23 @@
 <div class="mb-5">
   <h1 class="title is-2">Organization Dashboard</h1>
   <div class="box mb-4">
-    <p><strong>Organization:</strong> {{ organization_name }}</p>
-    <p><strong>User Name:</strong> {{ user_display_name }}</p>
-    <p><strong>Role:</strong> {{ user_role }}</p>
+    <div class="level">
+      <div class="level-left">
+        <div>
+          <p><strong>Organization:</strong> {{ organization_name }}</p>
+          <p><strong>User Name:</strong> {{ user_display_name }}</p>
+          <p><strong>Role:</strong> {{ user_role }}</p>
+        </div>
+      </div>
+      {% if can_invite_staff %}
+      <div class="level-right">
+        <a href="{% url 'staff_invite_send' %}" class="button is-link">
+          ✉️ Invite Staff Member
+        </a>
+      </div>
+      {% endif %}
+    </div>
   </div>
-  {% comment %} <div class="buttons">
-    <a href="{% url 'registry_network' %}" class="button is-link">Network Registry</a>
-    <a href="{% url 'ai_match_staff' %}" class="button is-info">✨ AI Assisted Match</a>
-  </div> {% endcomment %}
 </div>
 
 <!-- Pending Matches (awaiting caregiver/client approval) -->
@@ -154,6 +163,12 @@
   </a>
   <a href="?view=clients" class="button {% if selected_view == 'clients' %}is-link{% else %}is-light{% endif %}">
     Clients 
+  </a>
+  <a href="?view=staff" class="button {% if selected_view == 'staff' %}is-link{% else %}is-light{% endif %}">
+    👤 Staff Members
+    {% if pending_invites and pending_invites.paginator.count %}
+      <span class="tag is-warning is-light ml-2">{{ pending_invites.paginator.count }} pending</span>
+    {% endif %}
   </a>
 </div>
 
@@ -310,5 +325,133 @@
   </div>
 </div>
 {% endif %}
+
+<!-- STAFF TABLE -->
+{% if selected_view == "staff" %}
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level">
+      <div class="level-left">
+        <h2 class="title is-4">👤 Staff Members</h2>
+      </div>
+      <div class="level-right">
+        {% if can_invite_staff %}
+        <a href="{% url 'staff_invite_send' %}" class="button is-link is-small">✉️ Invite Staff</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if staff_members %}
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Email</th>
+            <th scope="col">Role</th>
+            <th scope="col">Can Approve</th>
+            <th scope="col">Can Invite</th>
+            <th scope="col">Joined</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member in staff_members %}
+          <tr>
+            <td>{{ member.staff_profile.user_profile.display_name }}</td>
+            <td>{{ member.staff_profile.user_profile.auth_email }}</td>
+            <td>
+              {% if member.role == "admin" %}
+                <span class="tag is-link is-light">Admin</span>
+              {% else %}
+                <span class="tag is-info is-light">Staff</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if member.can_approve_applications %}
+                <span class="tag is-success is-light">Yes</span>
+              {% else %}
+                <span class="tag is-light has-text-grey">No</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if member.can_invite_staff %}
+                <span class="tag is-success is-light">Yes</span>
+              {% else %}
+                <span class="tag is-light has-text-grey">No</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if member.accepted_at %}
+                {{ member.accepted_at|date:"N j, Y" }}
+              {% elif member.start_date %}
+                {{ member.start_date|date:"N j, Y" }}
+              {% else %}
+                <span class="has-text-grey-light">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6">No active staff members yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/_pagination.html" with page_obj=staff_members page_param="staff_page" %}
+    {% else %}
+    <p class="has-text-grey-light is-italic">No active staff members yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Pending Staff Invitations -->
+{% if pending_invites %}
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <h2 class="title is-5">📬 Pending Invitations</h2>
+    <p class="is-size-7 has-text-grey mb-3">These staff invites have been sent but not yet accepted.</p>
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Email</th>
+            <th scope="col">Role</th>
+            <th scope="col">Invited</th>
+            <th scope="col">Expires</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for invite in pending_invites %}
+          <tr>
+            <td>{{ invite.email }}</td>
+            <td>
+              {% if invite.role == "admin" %}
+                <span class="tag is-link is-light">Admin</span>
+              {% else %}
+                <span class="tag is-info is-light">Staff</span>
+              {% endif %}
+            </td>
+            <td>{{ invite.created_at|date:"N j, Y" }}</td>
+            <td>{{ invite.expires_at|date:"N j, Y" }}</td>
+            <td>
+              {% if invite.is_expired %}
+                <span class="tag is-danger is-light">Expired</span>
+              {% else %}
+                <span class="tag is-warning is-light">Awaiting</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">No pending invitations.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/_pagination.html" with page_obj=pending_invites page_param="invites_page" %}
+  </div>
+</div>
+{% endif %}
+
+{% endif %}{# end staff view #}
 
 {% endblock %}

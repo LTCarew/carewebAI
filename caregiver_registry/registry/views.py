@@ -767,7 +767,7 @@ def org_dashboard(request):
         match_inquiries = pending_caregiver_matches = pending_client_matches = active_matches = declined_matches = None
 
     selected_view = request.GET.get("view", "caregivers")
-    if selected_view not in ("caregivers", "clients"):
+    if selected_view not in ("caregivers", "clients", "staff"):
         selected_view = "caregivers"
 
     # Paginate the caregiver and client application lists
@@ -784,6 +784,40 @@ def org_dashboard(request):
         "support_person__user_profile",
     ).prefetch_related("entries").order_by("-created_at") if active_org else Schedule.objects.none()
     all_schedules = Paginator(all_schedules_qs, 10).get_page(request.GET.get("schedules_page", 1))
+
+    # ── Staff members & pending invites ──────────────────────────────────────
+    from organizations.models import OrganizationStaff, OrganizationStaffInvite
+    can_invite_staff = False
+    staff_members_page = None
+    pending_invites_page = None
+
+    if active_org:
+        try:
+            my_org_staff = OrganizationStaff.objects.get(
+                staff_profile=request.user.profile.staff_profile,
+                organization=active_org,
+                status="active",
+            )
+            can_invite_staff = (my_org_staff.role == "admin" or my_org_staff.can_invite_staff)
+        except (OrganizationStaff.DoesNotExist, AttributeError):
+            pass
+
+        staff_qs = OrganizationStaff.objects.filter(
+            organization=active_org,
+            status="active",
+        ).select_related(
+            "staff_profile__user_profile__user",
+        ).order_by(
+            "staff_profile__user_profile__user__last_name",
+            "staff_profile__user_profile__user__first_name",
+        )
+        staff_members_page = Paginator(staff_qs, 10).get_page(request.GET.get("staff_page", 1))
+
+        invites_qs = OrganizationStaffInvite.objects.filter(
+            organization=active_org,
+            accepted=False,
+        ).order_by("-created_at")
+        pending_invites_page = Paginator(invites_qs, 10).get_page(request.GET.get("invites_page", 1))
 
     return render(request, "registry/org_dashboard.html", {
         "caregivers": caregivers_page,
@@ -804,6 +838,10 @@ def org_dashboard(request):
         "declined_matches": declined_matches,
         # Schedule oversight
         "all_schedules": all_schedules,
+        # Staff members & invites
+        "staff_members": staff_members_page,
+        "pending_invites": pending_invites_page,
+        "can_invite_staff": can_invite_staff,
     })
 
 

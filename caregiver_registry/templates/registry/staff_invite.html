@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Invite Staff — {{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="columns is-centered">
+  <div class="column is-8-tablet is-6-desktop">
+
+    <div class="mb-4">
+      <a href="{% url 'org_dashboard' %}" class="button is-light is-small">← Back to Dashboard</a>
+    </div>
+
+    <div class="card app-card">
+      <div class="card-content">
+
+        <div class="app-page-intro mb-5">
+          <h1 class="title is-3">Invite Staff Member</h1>
+          <p class="subtitle is-6">
+            Invite someone to join <strong>{{ organization.name }}</strong> as a staff member or administrator.
+            They will receive an email with a link to create their account.
+          </p>
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="notification is-danger is-light">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <!-- Email -->
+          <div class="field app-field">
+            <label class="label" for="{{ form.email.id_for_label }}">
+              {{ form.email.label }} <span class="has-text-danger" aria-label="required">*</span>
+            </label>
+            <div class="control">{{ form.email }}</div>
+            {% if form.email.help_text %}
+              <p class="help">{{ form.email.help_text }}</p>
+            {% endif %}
+            {% if form.email.errors %}
+              <div class="help is-danger" role="alert">{{ form.email.errors }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Role -->
+          <div class="field app-field">
+            <label class="label" for="{{ form.role.id_for_label }}">
+              {{ form.role.label }} <span class="has-text-danger" aria-label="required">*</span>
+            </label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                {{ form.role }}
+              </div>
+            </div>
+            {% if form.role.help_text %}
+              <p class="help">{{ form.role.help_text }}</p>
+            {% endif %}
+            {% if form.role.errors %}
+              <div class="help is-danger" role="alert">{{ form.role.errors }}</div>
+            {% endif %}
+          </div>
+
+          <h2 class="title is-6 mt-5 mb-3">Permissions</h2>
+          <p class="is-size-7 has-text-grey mb-3">
+            Admin role automatically receives all permissions. For Staff role, select which additional permissions to grant.
+          </p>
+
+          <!-- can_approve_applications -->
+          <div class="field app-field">
+            <label class="checkbox">
+              {{ form.can_approve_applications }}
+              {{ form.can_approve_applications.label }}
+            </label>
+            {% if form.can_approve_applications.errors %}
+              <div class="help is-danger" role="alert">{{ form.can_approve_applications.errors }}</div>
+            {% endif %}
+          </div>
+
+          <!-- can_invite_staff -->
+          <div class="field app-field">
+            <label class="checkbox">
+              {{ form.can_invite_staff }}
+              {{ form.can_invite_staff.label }}
+            </label>
+            {% if form.can_invite_staff.errors %}
+              <div class="help is-danger" role="alert">{{ form.can_invite_staff.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="notification is-info is-light mt-5">
+            <strong>📧 How it works:</strong> The invited person will receive an email with a unique link.
+            When they click it, they'll complete a short signup form to create their account —
+            including name, password, and contact details — and will immediately have access to
+            the organization dashboard.
+          </div>
+
+          <div class="buttons mt-5">
+            <button type="submit" class="button is-link is-medium">Send Invitation</button>
+            <a href="{% url 'org_dashboard' %}" class="button is-light is-medium">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

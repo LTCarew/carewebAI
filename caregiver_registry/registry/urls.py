@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from accounts.views import organization_signup
+from accounts.views import organization_signup, staff_invite_send, staff_signup
 
 urlpatterns = [
 
@@ -195,5 +195,17 @@ urlpatterns = [
         "schedule-entries/<int:entry_pk>/support/<str:action>/",
         views.schedule_entry_support_respond,
         name="schedule_entry_support_respond",
+    ),
+
+    # ── Staff Invite URLs ─────────────────────────────────────────────────────
+    path(
+        "dashboard/org/staff/invite/",
+        staff_invite_send,
+        name="staff_invite_send",
+    ),
+    path(
+        "staff/signup/<uuid:token>/",
+        staff_signup,
+        name="staff_signup",
     ),
 ]

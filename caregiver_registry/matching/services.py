@@ -316,19 +316,36 @@ def compute_match_score(caregiver, client, selected_tag_ids=None):
     total += avail_score
 
     # ── 3. Location / ZIP match (10 pts) ────────────────────────────────────
-    loc_score = 0.0
+    # Uses real haversine distance between ZIP code centroids (stdlib-only,
+    # no network calls).  Falls back to the old prefix-match heuristic when
+    # a ZIP is not found in the bundled dataset (invalid / non-US ZIP).
+    from .zip_distance import zip_distance_miles, location_score_from_distance
+
     caregiver_zip = (caregiver.base_zip_code or "").strip()
     client_zip = (client.base_zip_code or "").strip()
-    same_zip = caregiver_zip and client_zip and caregiver_zip == client_zip
-    if same_zip:
-        loc_score = 10.0
-    elif caregiver_zip and client_zip and caregiver_zip[:3] == client_zip[:3]:
-        loc_score = 5.0
+    same_zip = bool(caregiver_zip and client_zip and caregiver_zip.split("-")[0] == client_zip.split("-")[0])
+
+    distance_miles = None
+    loc_score = 0.0
+
+    if caregiver_zip and client_zip:
+        distance_miles = zip_distance_miles(caregiver_zip, client_zip)
+        if distance_miles is not None:
+            # Real distance available — use tiered scoring
+            loc_score = location_score_from_distance(distance_miles)
+        else:
+            # ZIP not in dataset — graceful fallback to old prefix heuristic
+            if same_zip:
+                loc_score = 10.0
+            elif caregiver_zip[:3] == client_zip[:3]:
+                loc_score = 5.0
+
     details["location"] = {
         "score": round(loc_score, 1),
         "caregiver_zip": caregiver_zip,
         "client_zip": client_zip,
         "same_zip": same_zip,
+        "distance_miles": distance_miles,
     }
     total += loc_score
 
@@ -371,6 +388,8 @@ def compute_match_score(caregiver, client, selected_tag_ids=None):
         )
     if same_zip:
         reasoning_parts.append("same ZIP code")
+    elif distance_miles is not None and loc_score > 0:
+        reasoning_parts.append(f"approximately {distance_miles} miles away")
     elif loc_score > 0:
         reasoning_parts.append("nearby ZIP code area")
     if lang_overlap:
@@ -408,13 +427,25 @@ def _build_chatgpt_prompt(caregiver, client):
 
     Privacy note: only anonymized profile attributes (skills, availability,
     languages, ZIP, care needs) are sent — no names, emails, or IDs.
+
+    Returns:
+        tuple of (caregiver_data, client_data, distance_miles)
+        where distance_miles is a float (computed haversine distance) or None.
     """
+    from .zip_distance import zip_distance_miles as _zdm
+
+    caregiver_zip = (caregiver.base_zip_code or "").strip()
+    client_zip = (client.base_zip_code or "").strip()
+
+    # Compute real distance so ChatGPT gets a factual number, not a guess
+    distance_miles = _zdm(caregiver_zip, client_zip) if (caregiver_zip and client_zip) else None
+
     caregiver_data = {
         "experience_with": caregiver.experience_with or [],
         "languages_spoken": caregiver.languages_spoken or [],
         "availability": caregiver.availability or {},
         "transportation": caregiver.transportation or [],
-        "zip_code": (caregiver.base_zip_code or "").strip(),
+        "zip_code": caregiver_zip,
         "hours_looking_for": getattr(caregiver, "hours_looking_for", ""),
         "desired_hours_per_week": getattr(caregiver, "desired_hours_per_week", None),
         "pathogen_protocols": caregiver.pathogen_protocols or [],
@@ -424,12 +455,12 @@ def _build_chatgpt_prompt(caregiver, client):
         "care_needs": client.care_needs or [],
         "languages_preferred": client.languages_preferred or [],
         "availability": client.availability or {},
-        "zip_code": (client.base_zip_code or "").strip(),
+        "zip_code": client_zip,
         "desired_hours_per_week": getattr(client, "hours_per_week", None),
         "pathogen_protocol_preferences": client.pathogen_protocol_preferences or [],
         "additional_care_needs": (client.additional_care_needs or "")[:300],
     }
-    return caregiver_data, client_data
+    return caregiver_data, client_data, distance_miles
 
 
 def _call_chatgpt_match_score(caregiver, client):
@@ -454,7 +485,13 @@ def _call_chatgpt_match_score(caregiver, client):
     if not enabled or not api_key:
         return None
 
-    caregiver_data, client_data = _build_chatgpt_prompt(caregiver, client)
+    caregiver_data, client_data, distance_miles = _build_chatgpt_prompt(caregiver, client)
+
+    # Format distance context so the model gets a hard fact, not a ZIP-inference guess
+    if distance_miles is not None:
+        distance_context = f"Computed geographic distance: {distance_miles} miles apart."
+    else:
+        distance_context = "Geographic distance: unknown (ZIP code not in dataset)."
 
     system_prompt = (
         "You are an expert caregiver-client matching specialist for a home care registry. "
@@ -466,12 +503,14 @@ def _call_chatgpt_match_score(caregiver, client):
         "  reasoning — a single paragraph (2-4 sentences) explaining the match quality\n"
         "  strengths — a JSON array of up to 4 short strings describing match strengths\n"
         "  concerns  — a JSON array of up to 3 short strings describing potential gaps or concerns\n"
-        "Be concise and specific. Focus on care needs alignment, availability, language, and location."
+        "Be concise and specific. Focus on care needs alignment, availability, language, and location. "
+        "Use the provided computed distance rather than guessing proximity from ZIP codes."
     )
 
     user_message = (
         f"Caregiver profile:\n{json.dumps(caregiver_data, indent=2)}\n\n"
         f"Client profile:\n{json.dumps(client_data, indent=2)}\n\n"
+        f"{distance_context}\n\n"
         "Rate the compatibility and return a JSON object as described."
     )
 

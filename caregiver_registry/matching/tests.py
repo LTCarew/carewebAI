@@ -380,7 +380,217 @@ class LocalScoringTest(TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. Unauthorized users cannot approve/decline unrelated matches
+# 8. Distance-based location scoring (zip_distance + compute_match_score)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ZipDistanceModuleTest(TestCase):
+    """
+    Unit tests for matching.zip_distance — no Django DB required, but we inherit
+    TestCase for consistency with the rest of the suite.
+
+    These tests exercise the haversine math and the bundled US ZIP dataset
+    without any network calls.
+    """
+
+    def _zdm(self, z1, z2):
+        from matching.zip_distance import zip_distance_miles
+        return zip_distance_miles(z1, z2)
+
+    def _lsfd(self, miles):
+        from matching.zip_distance import location_score_from_distance
+        return location_score_from_distance(miles)
+
+    def _coords(self, z):
+        from matching.zip_distance import get_zip_coordinates
+        return get_zip_coordinates(z)
+
+    # ── get_zip_coordinates ──────────────────────────────────────────────────
+
+    def test_known_zip_returns_coordinates(self):
+        """A well-known ZIP in the bundled dataset returns a (lat, lon) tuple."""
+        coords = self._coords("90210")
+        self.assertIsNotNone(coords)
+        lat, lon = coords
+        # Beverly Hills is ~34°N, ~118°W
+        self.assertAlmostEqual(lat, 34.09, delta=0.5)
+        self.assertAlmostEqual(lon, -118.40, delta=0.5)
+
+    def test_unknown_zip_returns_none(self):
+        """A ZIP that does not exist in the dataset returns None."""
+        self.assertIsNone(self._coords("00000"))
+
+    def test_zip_plus4_is_normalized(self):
+        """ZIP+4 format is stripped and the base 5-digit ZIP is looked up."""
+        self.assertIsNotNone(self._coords("94103-1234"))
+        self.assertEqual(self._coords("94103-1234"), self._coords("94103"))
+
+    # ── zip_distance_miles ───────────────────────────────────────────────────
+
+    def test_same_zip_returns_zero(self):
+        """Same ZIP → exactly 0.0 miles."""
+        self.assertEqual(self._zdm("94103", "94103"), 0.0)
+
+    def test_same_zip_plus4_returns_zero(self):
+        """Same ZIP with ZIP+4 suffix → 0.0 miles."""
+        self.assertEqual(self._zdm("94103-0001", "94103-9999"), 0.0)
+
+    def test_neighbouring_beverly_hills_zips(self):
+        """90210 and 90211 are both Beverly Hills — should be < 5 miles apart."""
+        d = self._zdm("90210", "90211")
+        self.assertIsNotNone(d)
+        self.assertLess(d, 5.0)
+        self.assertGreater(d, 0.0)
+
+    def test_sf_to_manhattan_is_far(self):
+        """94103 (San Francisco) to 10001 (Manhattan) should be well over 2000 miles."""
+        d = self._zdm("94103", "10001")
+        self.assertIsNotNone(d)
+        self.assertGreater(d, 2000.0)
+
+    def test_invalid_zip_returns_none(self):
+        """If either ZIP is not in the dataset, None is returned."""
+        self.assertIsNone(self._zdm("00000", "90210"))
+        self.assertIsNone(self._zdm("90210", "XXXXX"))
+
+    def test_known_zip_pair_distance_is_reasonable(self):
+        """
+        94103 (SF SOMA) and 94110 (SF Mission) are both San Francisco ZIPs —
+        they should be less than 5 miles apart.
+        """
+        d = self._zdm("94103", "94110")
+        self.assertIsNotNone(d)
+        self.assertLess(d, 5.0)
+
+    # ── location_score_from_distance ─────────────────────────────────────────
+
+    def test_score_zero_miles(self):
+        """Exact same location (0 mi) → full 10 points."""
+        self.assertEqual(self._lsfd(0.0), 10.0)
+
+    def test_score_within_5_miles(self):
+        """≤5 miles → full 10 points."""
+        self.assertEqual(self._lsfd(4.9), 10.0)
+        self.assertEqual(self._lsfd(5.0), 10.0)
+
+    def test_score_within_15_miles(self):
+        """5 < distance ≤ 15 miles → 7 points."""
+        self.assertEqual(self._lsfd(5.1), 7.0)
+        self.assertEqual(self._lsfd(15.0), 7.0)
+
+    def test_score_within_30_miles(self):
+        """15 < distance ≤ 30 miles → 4 points."""
+        self.assertEqual(self._lsfd(15.1), 4.0)
+        self.assertEqual(self._lsfd(30.0), 4.0)
+
+    def test_score_within_50_miles(self):
+        """30 < distance ≤ 50 miles → 2 points."""
+        self.assertEqual(self._lsfd(30.1), 2.0)
+        self.assertEqual(self._lsfd(50.0), 2.0)
+
+    def test_score_over_50_miles(self):
+        """More than 50 miles → 0 points."""
+        self.assertEqual(self._lsfd(50.1), 0.0)
+        self.assertEqual(self._lsfd(2000.0), 0.0)
+
+    def test_score_none_distance(self):
+        """None distance (unknown ZIP) → 0 points."""
+        self.assertEqual(self._lsfd(None), 0.0)
+
+
+class LocationScoringIntegrationTest(TestCase):
+    """
+    Integration tests: compute_match_score produces the correct location
+    sub-score based on real ZIP distances from the bundled dataset.
+    """
+
+    def _score_result(self, cg_zip, cl_zip):
+        """Helper: create minimal profiles with the given ZIPs and score them."""
+        # Include both ZIPs in each username to guarantee uniqueness across calls
+        _, cg = make_caregiver_profile(f"cg_loc_{cg_zip}_{cl_zip}", zip_code=cg_zip)
+        _, cl = make_client_profile(f"cl_loc_{cl_zip}_{cg_zip}", zip_code=cl_zip)
+        return compute_match_score(cg, cl)
+
+    def test_same_zip_location_score_is_10(self):
+        """Exact same ZIP → location score = 10."""
+        result = self._score_result("94103", "94103")
+        loc = result["details"]["location"]
+        self.assertEqual(loc["score"], 10.0)
+        self.assertEqual(loc["distance_miles"], 0.0)
+        self.assertTrue(loc["same_zip"])
+
+    def test_nearby_zips_score_higher_than_far_zips(self):
+        """
+        94103 (SF) and 94110 (SF Mission) should score much higher than
+        94103 (SF) and 10001 (Manhattan).
+        """
+        nearby = self._score_result("94103", "94110")
+        far = self._score_result("94103", "10001")
+        self.assertGreater(
+            nearby["details"]["location"]["score"],
+            far["details"]["location"]["score"],
+        )
+
+    def test_beverly_hills_neighbouring_zips_get_full_score(self):
+        """90210 and 90211 are < 5 miles apart — should get 10 pts."""
+        result = self._score_result("90210", "90211")
+        loc = result["details"]["location"]
+        self.assertEqual(loc["score"], 10.0)
+        self.assertIsNotNone(loc["distance_miles"])
+        self.assertLess(loc["distance_miles"], 5.0)
+
+    def test_far_apart_zips_get_zero_location_score(self):
+        """SF to NYC is > 2000 miles — location score should be 0."""
+        result = self._score_result("94103", "10001")
+        self.assertEqual(result["details"]["location"]["score"], 0.0)
+
+    def test_details_contains_distance_miles(self):
+        """distance_miles is always present in details (float or None)."""
+        result = self._score_result("94103", "94103")
+        self.assertIn("distance_miles", result["details"]["location"])
+
+    def test_same_invalid_zip_returns_zero_distance(self):
+        """
+        Two identical invalid ZIPs (not in dataset) still return 0.0 miles
+        via the same-ZIP shortcut and earn the full 10-point location score.
+        """
+        _, cg = make_caregiver_profile("cg_loc_sameInvalid", zip_code="00000")
+        _, cl = make_client_profile("cl_loc_sameInvalid", zip_code="00000")
+        result = compute_match_score(cg, cl)
+        loc = result["details"]["location"]
+        # Same-ZIP shortcut fires before the dataset lookup → returns 0.0, not None
+        self.assertEqual(loc["distance_miles"], 0.0)
+        self.assertEqual(loc["score"], 10.0)
+
+    def test_different_invalid_zips_fall_back_to_prefix_match(self):
+        """
+        Two different ZIPs that are not in the dataset (None distance) fall back
+        to the 3-digit prefix heuristic gracefully — no exceptions raised.
+        """
+        # "00000" and "XXXXX" are both absent from the dataset and have different prefixes
+        _, cg = make_caregiver_profile("cg_loc_diffInvalid", zip_code="00000")
+        _, cl = make_client_profile("cl_loc_diffInvalid", zip_code="XXXXX")
+        result = compute_match_score(cg, cl)
+        loc = result["details"]["location"]
+        self.assertIsNone(loc["distance_miles"])   # neither ZIP in dataset
+        self.assertIsInstance(loc["score"], float)
+        # Prefixes "000" vs "XXX" don't match → fallback score = 0
+        self.assertEqual(loc["score"], 0.0)
+
+    def test_reasoning_shows_distance_when_known(self):
+        """
+        For ZIPs that are in the dataset but not the same, the reasoning
+        string includes the computed distance.
+        """
+        result = self._score_result("90210", "90211")
+        # 90210 and 90211 are ~3.5 mi apart and within 5 mi → score=10
+        # (same_zip is False, distance is known and small — score > 0)
+        reasoning = result["ai_reasoning"]
+        # should mention distance or "same ZIP" — not the old vague wording
+        self.assertNotIn("nearby ZIP code area", reasoning)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Unauthorized users cannot approve/decline unrelated matches
 # ─────────────────────────────────────────────────────────────────────────────
 
 class UnauthorizedMatchResponseTest(TestCase):

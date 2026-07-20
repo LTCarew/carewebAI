@@ -875,7 +875,7 @@ def caregiver_detail(request, pk):
     """
     from .models import CaregiverProfile, ClientProfile
 
-    is_admin_staff = _redirect_if_not_admin_staff(request) is None
+    is_admin_staff = _user_is_admin_staff(request.user)
 
     # ── Admin / staff path ────────────────────────────────────────────────
     if is_admin_staff:
@@ -947,7 +947,7 @@ def client_detail(request, pk):
     """
     from .models import ClientProfile, CaregiverProfile
 
-    is_admin_staff = _redirect_if_not_admin_staff(request) is None
+    is_admin_staff = _user_is_admin_staff(request.user)
 
     # ── Admin / staff path ────────────────────────────────────────────────
     if is_admin_staff:

@@ -327,6 +327,64 @@ def match_cancel(request, match_id):
 # Stage 8: AI Assisted Match Views
 # ==============================================
 
+# ==============================================
+# Stability Snapshot: Flag for Stabilization Review
+# ==============================================
+
+@login_required
+def flag_stabilization_review(request, match_id):
+    """
+    Staff-only POST action: flag an active match for stabilization review.
+
+    Guards:
+    - User must be admin/staff (via user_is_admin_or_staff).
+    - The match must belong to the user's active organization.
+    - Duplicate active flags are silently ignored (idempotent success message).
+    """
+    from django.utils import timezone as _tz
+    from registry.services import user_is_admin_or_staff, get_active_organization
+
+    if request.method != "POST":
+        return redirect("org_dashboard")
+
+    if not user_is_admin_or_staff(request.user):
+        messages.error(request, "Only staff can flag relationships for stabilization review.")
+        return redirect("dashboard_redirect")
+
+    active_org = get_active_organization(request)
+    match = get_object_or_404(Match, pk=match_id)
+
+    # Org-scope check: the match must belong to the staff member's active org.
+    if match.organization != active_org:
+        messages.error(request, "You do not have permission to flag this relationship.")
+        return redirect("org_dashboard")
+
+    if match.stabilization_review_requested:
+        messages.info(request, "This relationship has already been flagged for stabilization review.")
+    else:
+        try:
+            requester_profile = request.user.profile
+        except Exception:
+            requester_profile = None
+
+        match.stabilization_review_requested = True
+        match.stabilization_review_requested_at = _tz.now()
+        match.stabilization_review_requested_by = requester_profile
+        match.save(update_fields=[
+            "stabilization_review_requested",
+            "stabilization_review_requested_at",
+            "stabilization_review_requested_by",
+            "updated_at",
+        ])
+        messages.success(
+            request,
+            f"Relationship between {match.caregiver.user_profile.display_name} "
+            f"and {match.client.user_profile.display_name} has been flagged for stabilization review.",
+        )
+
+    return redirect("org_dashboard")
+
+
 @login_required
 def ai_match_for_caregiver(request):
     """Redirect to Network Registry where AI matching now lives."""

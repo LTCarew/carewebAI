@@ -779,6 +779,12 @@ def org_dashboard(request):
         pending_client_matches    = paginate(pending_qs.filter(client_status="pending"), "p_cl")
         active_matches            = paginate(match_base.filter(status="active"), "p_act")
         declined_matches          = paginate(match_base.filter(status__in=["declined", "cancelled"]), "p_dec")
+
+        # ── Stability Snapshot: attach per-row snapshot to active match objects ──
+        from matching.stability import get_stability_snapshot as _get_stability_snapshot
+        for _m in active_matches.object_list:
+            _m.stability_snapshot = _get_stability_snapshot(_m)
+
     else:
         match_inquiries = pending_caregiver_matches = pending_client_matches = active_matches = declined_matches = None
 

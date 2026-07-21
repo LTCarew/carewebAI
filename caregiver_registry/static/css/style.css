@@ -739,3 +739,220 @@ ul.errorlist li,
         font-size: 1.15rem;
     }
 }
+
+
+/* ════════════════════════════════════════════════════
+   STABILITY SNAPSHOT — Status indicators and panel
+   Level 3 POC — Caregiver–client relationship monitoring
+   ════════════════════════════════════════════════════ */
+
+/*
+   Color tokens for stability statuses.
+   We never rely on color alone — each status also has a visible text label.
+   WCAG AA contrast is preserved in both light and dark themes.
+*/
+:root {
+    --stability-green:  #16a34a;   /* same green as Bulma is-success solid */
+    --stability-yellow: #a16207;   /* amber — darker than #f2e94e for contrast */
+    --stability-red:    var(--app-danger);  /* #da3e52 — reuses existing token */
+
+    --stability-green-bg:  #f0fdf4;
+    --stability-yellow-bg: #fefce8;
+    --stability-red-bg:    #fff1f2;
+
+    --stability-green-border:  #86efac;
+    --stability-yellow-border: #fde047;
+    --stability-red-border:    #fda4af;
+
+    --stability-panel-bg:    var(--app-surface);
+    --stability-panel-border: var(--app-border);
+}
+
+/* ── Status badge (dot + label) ──────────────────────────────────────────── */
+
+.stability-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    /* visible focus for keyboard users */
+    border-radius: 4px;
+}
+
+.stability-status:focus-visible {
+    outline: 3px solid var(--app-focus);
+    outline-offset: 2px;
+}
+
+.stability-status__dot {
+    display: inline-block;
+    width: 0.65em;
+    height: 0.65em;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Green / Stable */
+.stability-status--green {
+    color: var(--stability-green);
+}
+.stability-status--green .stability-status__dot {
+    background-color: var(--stability-green);
+}
+
+/* Yellow / Monitor */
+.stability-status--yellow {
+    color: var(--stability-yellow);
+}
+.stability-status--yellow .stability-status__dot {
+    background-color: #ca8a04;  /* slightly darker dot for visibility */
+}
+
+/* Red / At Risk */
+.stability-status--red {
+    color: var(--stability-red);
+}
+.stability-status--red .stability-status__dot {
+    background-color: var(--stability-red);
+}
+
+/* Inline variant used inside the panel heading */
+.stability-status--inline {
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-left: 0.5em;
+    vertical-align: middle;
+}
+
+/* ── Table cell ──────────────────────────────────────────────────────────── */
+
+.stability-cell {
+    min-width: 8rem;
+    vertical-align: top;
+}
+
+/* Subtle left-border accent on the table row — does NOT fill the whole row */
+tr:has(.stability-status--red) {
+    border-left: 3px solid var(--stability-red);
+}
+tr:has(.stability-status--yellow) {
+    border-left: 3px solid #eab308;
+}
+tr:has(.stability-status--green) {
+    border-left: 3px solid var(--stability-green);
+}
+
+/* ── <details> disclosure wrapper ────────────────────────────────────────── */
+
+.stability-details {
+    position: relative;
+}
+
+.stability-details > summary {
+    list-style: none;    /* hide default triangle in most browsers */
+}
+.stability-details > summary::-webkit-details-marker {
+    display: none;       /* hide triangle in Safari */
+}
+
+/* ── Expanded panel ──────────────────────────────────────────────────────── */
+
+.stability-panel {
+    position: absolute;
+    z-index: 100;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    min-width: 22rem;
+    max-width: 28rem;
+    background: var(--stability-panel-bg);
+    border: 1px solid var(--stability-panel-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 1rem 1.25rem;
+}
+
+.stability-panel__heading {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25em;
+}
+
+.stability-panel__score {
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+    color: var(--app-text-soft);
+}
+
+/* Signal table */
+.stability-signals {
+    margin: 0 0 0.75rem;
+    font-size: 0.82rem;
+}
+.stability-signals__row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+    border-bottom: 1px solid var(--app-border);
+}
+.stability-signals__row:last-child {
+    border-bottom: none;
+}
+.stability-signals dt {
+    font-weight: 600;
+    color: var(--app-text-soft);
+    margin: 0;
+}
+.stability-signals dd {
+    margin: 0;
+    text-align: right;
+}
+
+.stability-panel__explanation {
+    font-size: 0.82rem;
+    color: var(--app-text-soft);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+
+.stability-panel__action {
+    margin-top: 0.5rem;
+}
+
+.stability-panel__review-pending {
+    font-size: 0.85rem;
+    color: var(--stability-green);
+    font-weight: 600;
+    margin: 0;
+}
+
+.stability-panel__flag-btn {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ── Responsive: on small screens, anchor the panel to the left of viewport ─ */
+
+@media screen and (max-width: 768px) {
+    .stability-panel {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+    }
+}
+
+/*
+END STABILITY SNAPSHOT
+   ════════════════════════════════════════════════════ */

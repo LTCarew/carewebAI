@@ -33,6 +33,14 @@ urlpatterns = [
         name="match_cancel",
     ),
 
+    # ── Stability Snapshot: flag for review ──────────────────────────────────
+    # Also placed before the generic match/<id>/<action>/ catch-all.
+    path(
+        "match/<int:match_id>/stabilization-review/",
+        views.flag_stabilization_review,
+        name="flag_stabilization_review",
+    ),
+
     # ── Approve or decline a match ────────────────────────────────────────────
     path(
         "match/<int:match_id>/<str:action>/",

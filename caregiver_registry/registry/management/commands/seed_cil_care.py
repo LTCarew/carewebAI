@@ -162,12 +162,31 @@ class Command(BaseCommand):
             self._clear_seeded_data(org)
 
         # 2. Matched pairs
+        # The first 3 pairs get deterministic stability profiles for the demo:
+        #   Pair 1 → Green  (Stable):   all ratings 9
+        #   Pair 2 → Yellow (Monitor):  all ratings 6
+        #   Pair 3 → Red    (At Risk):  all ratings 3
+        # Remaining pairs keep the existing positive-skewed random ratings.
+        STABILITY_DEMO_SCORES = {
+            1: {"lo": 9, "hi": 9},    # green
+            2: {"lo": 6, "hi": 6},    # yellow
+            3: {"lo": 3, "hi": 3},    # red
+        }
+
         created_pairs = []
         for i in range(1, count + 1):
-            cg_profile, cl_profile = self._create_matched_pair(i, org, admin_user_profile)
+            score_band = STABILITY_DEMO_SCORES.get(i)  # None for i > 3
+            cg_profile, cl_profile = self._create_matched_pair(
+                i, org, admin_user_profile, score_band=score_band
+            )
             created_pairs.append((cg_profile, cl_profile))
+            stability_label = (
+                " [Green/Stable]"  if i == 1 else
+                " [Yellow/Monitor]" if i == 2 else
+                " [Red/At Risk]"    if i == 3 else ""
+            )
             self.stdout.write(f"  Pair {i:>2}: {cg_profile.user_profile.display_name}"
-                              f" ↔ {cl_profile.user_profile.display_name}")
+                              f" ↔ {cl_profile.user_profile.display_name}{stability_label}")
 
         self.stdout.write(self.style.SUCCESS(
             f"\n✓ Done!  Created {len(created_pairs)} matched pairs in '{ORG_NAME}'."
@@ -290,10 +309,14 @@ class Command(BaseCommand):
 
     # ── Pair creation ─────────────────────────────────────────────────────────
 
-    def _create_matched_pair(self, index, org, admin_profile):
+    def _create_matched_pair(self, index, org, admin_profile, score_band=None):
         """
         Create one caregiver + one client, approved in org, with an active
         Match, an approved Schedule, and past ScheduleEntryRatings.
+
+        score_band: optional dict {"lo": int, "hi": int} — when supplied, all
+        rating values are drawn from randint(lo, hi) so the Stability Snapshot
+        lands deterministically in the intended status tier.
         """
         cg_profile = self._create_caregiver(index)
         cl_profile  = self._create_client(index)
@@ -303,7 +326,7 @@ class Command(BaseCommand):
 
         match = self._create_active_match(cg_profile, cl_profile, org, admin_profile)
         schedule = self._create_approved_schedule(cg_profile, cl_profile, org, match, admin_profile)
-        self._create_ratings(schedule, cg_profile, cl_profile)
+        self._create_ratings(schedule, cg_profile, cl_profile, score_band=score_band)
 
         return cg_profile, cl_profile
 
@@ -555,11 +578,27 @@ class Command(BaseCommand):
 
     # ── Ratings ───────────────────────────────────────────────────────────────
 
-    def _create_ratings(self, schedule, cg_profile, cl_profile):
+    def _create_ratings(self, schedule, cg_profile, cl_profile, score_band=None):
+        """
+        Create ScheduleEntryRating rows for all entries in `schedule`.
+
+        score_band: optional dict {"lo": int, "hi": int}.  When provided,
+        every rating metric is drawn from randint(lo, hi) so the resulting
+        Stability Snapshot lands deterministically in the intended status:
+          lo=hi=9 → Green  (avg 9.0 ≥ 7.5)
+          lo=hi=6 → Yellow (avg 6.0 ≥ 5.0)
+          lo=hi=3 → Red    (avg 3.0 < 5.0)
+        """
         from registry.models import ScheduleEntry, ScheduleEntryRating
 
         client_up    = cl_profile.user_profile
         caregiver_up = cg_profile.user_profile
+
+        # Determine the score range: use demo band or the default positive skew.
+        if score_band:
+            lo, hi = score_band["lo"], score_band["hi"]
+        else:
+            lo, hi = None, None  # sentinel → use original random ranges below
 
         for entry in ScheduleEntry.objects.filter(schedule=schedule):
             occurrences = _past_occurrences(entry.day_of_week, weeks_back=5)
@@ -569,13 +608,22 @@ class Command(BaseCommand):
                     (client_up,    "client"),
                     (caregiver_up, "caregiver"),
                 ]:
-                    # Plausible-but-varied scores, skewed positive (6–10)
-                    scores = {
-                        "care_fit_respect":          random.randint(6, 10),
-                        "communication_coordination": random.randint(6, 10),
-                        "reliability_consistency":    random.randint(6, 10),
-                        "workload_support_balance":   random.randint(5, 10),
-                    }
+                    if lo is not None:
+                        # Deterministic demo score band — all four metrics fixed
+                        scores = {
+                            "care_fit_respect":          random.randint(lo, hi),
+                            "communication_coordination": random.randint(lo, hi),
+                            "reliability_consistency":    random.randint(lo, hi),
+                            "workload_support_balance":   random.randint(lo, hi),
+                        }
+                    else:
+                        # Default: plausible-but-varied, skewed positive (6–10)
+                        scores = {
+                            "care_fit_respect":          random.randint(6, 10),
+                            "communication_coordination": random.randint(6, 10),
+                            "reliability_consistency":    random.randint(6, 10),
+                            "workload_support_balance":   random.randint(5, 10),
+                        }
                     notes_pool = [
                         "",
                         "Great session overall.",

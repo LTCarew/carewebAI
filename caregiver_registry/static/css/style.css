@@ -1046,3 +1046,213 @@ tr:has(.stability-status--none) {
 /*
 END STABILITY SNAPSHOT
    ════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
+   INFO TIPS — plain-language tooltip icons
+   Used on stability signal labels and rating metric column headers
+   so staff reviewers always know what each term means.
+   ════════════════════════════════════════════════════ */
+
+.info-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 0.3em;
+}
+
+/* The small circular "i" button */
+.info-tip__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    border: 1.5px solid var(--app-primary);
+    background: transparent;
+    color: var(--app-primary);
+    font-size: 0.75em;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 120ms ease, color 120ms ease;
+    /* reset browser button defaults */
+    -webkit-appearance: none;
+    appearance: none;
+    font-family: Georgia, serif;  /* italic "i" looks better in serif */
+}
+
+.info-tip__btn:hover,
+.info-tip__btn:focus-visible {
+    background-color: var(--app-primary);
+    color: #fff;
+    outline: none;
+}
+
+.info-tip__btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(126, 107, 143, 0.35);
+}
+
+/* The tooltip bubble */
+.info-tip__body {
+    display: none;
+    position: absolute;
+    z-index: 300;
+    bottom: calc(100% + 0.6rem);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 17rem;
+    max-width: 24rem;
+    background: #1e293b;
+    color: #f8fafc;
+    font-size: 0.78rem;
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1.55;
+    padding: 0.65rem 0.9rem;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+    pointer-events: none;
+    white-space: normal;
+    text-align: left;
+}
+
+/* Down-pointing arrow */
+.info-tip__body::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* Show on hover (CSS, desktop) or focus-within (keyboard) or .is-open (JS tap toggle) */
+.info-tip:hover .info-tip__body,
+.info-tip:focus-within .info-tip__body,
+.info-tip.is-open .info-tip__body {
+    display: block;
+}
+
+/* On narrow screens flip the bubble below the icon instead of above */
+@media screen and (max-width: 768px) {
+    .info-tip__body {
+        bottom: auto;
+        top: calc(100% + 0.5rem);
+        min-width: 13rem;
+        max-width: 88vw;
+        /* shift left if near the right edge */
+        left: 0;
+        transform: none;
+    }
+    .info-tip__body::after {
+        top: auto;
+        bottom: 100%;
+        left: 1rem;
+        transform: none;
+        border-top-color: transparent;
+        border-bottom-color: #1e293b;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   END INFO TIPS
+   ════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
+   GLOSSARY PANEL — <details>/<summary> disclosure block
+   on the Stability Detail page
+   ════════════════════════════════════════════════════ */
+
+.glossary-panel {
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: #f8fafc;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.glossary-panel summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.75rem 1.1rem;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--app-primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    user-select: none;
+}
+
+.glossary-panel summary::-webkit-details-marker {
+    display: none;
+}
+
+.glossary-panel summary::before {
+    content: "▶";
+    font-size: 0.65em;
+    transition: transform 150ms ease;
+    display: inline-block;
+}
+
+.glossary-panel[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.glossary-panel summary:focus-visible {
+    outline: 3px solid var(--app-focus);
+    outline-offset: -2px;
+}
+
+.glossary-panel__body {
+    padding: 0.25rem 1.1rem 1rem;
+    border-top: 1px solid var(--app-border);
+}
+
+.glossary-panel__body dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 1rem;
+    margin: 0;
+    font-size: 0.84rem;
+}
+
+.glossary-panel__body dt {
+    font-weight: 700;
+    color: var(--app-text);
+    white-space: nowrap;
+    padding-top: 0.1rem;
+}
+
+.glossary-panel__body dd {
+    margin: 0;
+    color: var(--app-text-soft);
+    line-height: 1.5;
+}
+
+.glossary-panel__section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    grid-column: 1 / -1;
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
+    border-top: 1px dashed var(--app-border);
+}
+
+.glossary-panel__section-label:first-child {
+    margin-top: 0;
+    border-top: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   END GLOSSARY PANEL
+   ════════════════════════════════════════════════════ */

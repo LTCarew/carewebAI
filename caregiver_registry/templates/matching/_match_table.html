@@ -34,7 +34,20 @@ Behaviour:
         <th scope="col">Tags</th>
         <th scope="col">Client Status</th>
         <th scope="col">Careworker Status</th>
-        {% if show_stability %}<th scope="col">Stability</th>{% endif %}
+        {% if show_stability %}
+        <th scope="col">
+          Stability
+          <span class="info-tip">
+            <button class="info-tip__btn" type="button" aria-expanded="false"
+                    aria-label="What is Stability?">i</button>
+            <span class="info-tip__body" role="tooltip">
+              A relationship health snapshot based on session ratings submitted
+              by both the client and careworker after each scheduled appointment.
+              Click the status label to view the full breakdown.
+            </span>
+          </span>
+        </th>
+        {% endif %}
         {% if show_actions %}<th scope="col">Actions</th>{% endif %}
       </tr>
     </thead>

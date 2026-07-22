@@ -27,6 +27,47 @@
   </p>
 </div>
 
+{# ── Plain-language glossary ─────────────────────────────────────────────── #}
+<details class="glossary-panel mb-5">
+  <summary>📖 What do these terms mean? (click to expand)</summary>
+  <div class="glossary-panel__body">
+    <dl>
+
+      <span class="glossary-panel__section-label">Relationship Signals</span>
+
+      <dt>Schedule Consistency</dt>
+      <dd>How reliably scheduled sessions have been happening, based on the Reliability &amp; Consistency ratings submitted by both the client and careworker after sessions.</dd>
+
+      <dt>Travel Burden</dt>
+      <dd>The driving distance between the careworker and client. This is the only signal not based on session ratings — it is a fixed geographic measurement calculated when the match was created.</dd>
+
+      <dt>Access Alignment</dt>
+      <dd>How well the careworker's approach fits the client's needs and treats them with respect, based on Care Fit &amp; Respect ratings.</dd>
+
+      <dt>Care Continuity</dt>
+      <dd>Overall relationship stability, calculated from the combined average of all four rating categories. Lower scores may indicate that friction is building up in the relationship.</dd>
+
+      <dt>Support Flags</dt>
+      <dd>Whether the workload feels sustainable and appropriately supported for everyone involved, based on Workload &amp; Support Balance ratings. This signal is also automatically set to "Immediate review recommended" if a staff member has manually flagged this relationship.</dd>
+
+      <span class="glossary-panel__section-label">Session Rating Metrics (1–10 scale)</span>
+
+      <dt>Care Fit &amp; Respect</dt>
+      <dd>"Does this careworker's approach fit the client's needs and treat them with dignity and respect?"</dd>
+
+      <dt>Communication</dt>
+      <dd>"How well do the careworker and client communicate and coordinate around scheduling, needs, and expectations?"</dd>
+
+      <dt>Reliability</dt>
+      <dd>"Attendance, punctuality, and follow-through on scheduled sessions."</dd>
+
+      <dt>Workload Balance</dt>
+      <dd>"Does this care arrangement feel sustainable and appropriately supported for everyone involved?" Low scores here often signal caregiver burnout or a mismatch between the tasks agreed to and what is actually happening.</dd>
+
+    </dl>
+  </div>
+</details>
+
 {# ── Snapshot overview card ───────────────────────────────────────────────── #}
 <div class="card app-card mb-5">
   <div class="card-content">
@@ -71,7 +112,17 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">Schedule Consistency</th>
+            <th scope="row">
+              Schedule Consistency
+              <span class="info-tip">
+                <button class="info-tip__btn" type="button" aria-expanded="false"
+                        aria-label="What is Schedule Consistency?">i</button>
+                <span class="info-tip__body" role="tooltip">
+                  How reliably scheduled sessions have been happening, based on the
+                  Reliability &amp; Consistency ratings submitted after each session.
+                </span>
+              </span>
+            </th>
             <td>
               <span class="tag {% if snapshot.signals.schedule_consistency == 'Good' %}is-success is-light{% elif snapshot.signals.schedule_consistency == 'Poor' %}is-danger is-light{% elif snapshot.signals.schedule_consistency == 'Not yet rated' %}is-light{% else %}is-warning is-light{% endif %}">
                 {{ snapshot.signals.schedule_consistency }}
@@ -79,7 +130,18 @@
             </td>
           </tr>
           <tr>
-            <th scope="row">Travel Burden</th>
+            <th scope="row">
+              Travel Burden
+              <span class="info-tip">
+                <button class="info-tip__btn" type="button" aria-expanded="false"
+                        aria-label="What is Travel Burden?">i</button>
+                <span class="info-tip__body" role="tooltip">
+                  The driving distance between the careworker and client. This is the only
+                  signal not based on session ratings — it is a fixed geographic measurement
+                  calculated when the match was created.
+                </span>
+              </span>
+            </th>
             <td>
               <span class="tag {% if snapshot.signals.travel_burden == 'Low' %}is-success is-light{% elif snapshot.signals.travel_burden == 'High' %}is-danger is-light{% else %}is-warning is-light{% endif %}">
                 {{ snapshot.signals.travel_burden }}
@@ -87,7 +149,17 @@
             </td>
           </tr>
           <tr>
-            <th scope="row">Access Alignment</th>
+            <th scope="row">
+              Access Alignment
+              <span class="info-tip">
+                <button class="info-tip__btn" type="button" aria-expanded="false"
+                        aria-label="What is Access Alignment?">i</button>
+                <span class="info-tip__body" role="tooltip">
+                  How well the careworker's approach fits the client's needs and treats them
+                  with respect, based on Care Fit &amp; Respect ratings.
+                </span>
+              </span>
+            </th>
             <td>
               <span class="tag {% if snapshot.signals.access_alignment == 'Aligned' %}is-success is-light{% elif snapshot.signals.access_alignment == 'Significant mismatch' %}is-danger is-light{% elif snapshot.signals.access_alignment == 'Not yet rated' %}is-light{% else %}is-warning is-light{% endif %}">
                 {{ snapshot.signals.access_alignment }}
@@ -95,7 +167,18 @@
             </td>
           </tr>
           <tr>
-            <th scope="row">Care Continuity</th>
+            <th scope="row">
+              Care Continuity
+              <span class="info-tip">
+                <button class="info-tip__btn" type="button" aria-expanded="false"
+                        aria-label="What is Care Continuity?">i</button>
+                <span class="info-tip__body" role="tooltip">
+                  Overall relationship stability, calculated from the combined average of all
+                  four rating categories. Lower scores may indicate that friction is building
+                  up in the relationship.
+                </span>
+              </span>
+            </th>
             <td>
               <span class="tag {% if snapshot.signals.care_continuity == 'Stable' %}is-success is-light{% elif snapshot.signals.care_continuity == 'Frequent disruption' %}is-danger is-light{% elif snapshot.signals.care_continuity == 'Not yet rated' %}is-light{% else %}is-warning is-light{% endif %}">
                 {{ snapshot.signals.care_continuity }}
@@ -103,7 +186,19 @@
             </td>
           </tr>
           <tr>
-            <th scope="row">Support Flags</th>
+            <th scope="row">
+              Support Flags
+              <span class="info-tip">
+                <button class="info-tip__btn" type="button" aria-expanded="false"
+                        aria-label="What are Support Flags?">i</button>
+                <span class="info-tip__body" role="tooltip">
+                  Whether the workload feels sustainable and appropriately supported for
+                  everyone involved, based on Workload &amp; Support Balance ratings. Also
+                  set to "Immediate review recommended" whenever a staff member manually
+                  flags this relationship.
+                </span>
+              </span>
+            </th>
             <td>
               <span class="tag {% if snapshot.signals.support_flags == 'None' %}is-success is-light{% elif snapshot.signals.support_flags == 'Immediate review recommended' %}is-danger is-light{% else %}is-warning is-light{% endif %}">
                 {{ snapshot.signals.support_flags }}
@@ -177,10 +272,51 @@
               <tr>
                 <th scope="col">Session Date</th>
                 <th scope="col">Rated By</th>
-                <th scope="col">Care Fit &amp; Respect</th>
-                <th scope="col">Communication</th>
-                <th scope="col">Reliability</th>
-                <th scope="col">Workload Balance</th>
+                <th scope="col">
+                  Care Fit &amp; Respect
+                  <span class="info-tip">
+                    <button class="info-tip__btn" type="button" aria-expanded="false"
+                            aria-label="What is Care Fit &amp; Respect?">i</button>
+                    <span class="info-tip__body" role="tooltip">
+                      "Does this careworker's approach fit the client's needs and treat
+                      them with dignity and respect?" Rated 1–10 after each session.
+                    </span>
+                  </span>
+                </th>
+                <th scope="col">
+                  Communication
+                  <span class="info-tip">
+                    <button class="info-tip__btn" type="button" aria-expanded="false"
+                            aria-label="What is Communication?">i</button>
+                    <span class="info-tip__body" role="tooltip">
+                      "How well do the careworker and client communicate and coordinate
+                      around scheduling, needs, and expectations?" Rated 1–10 after each session.
+                    </span>
+                  </span>
+                </th>
+                <th scope="col">
+                  Reliability
+                  <span class="info-tip">
+                    <button class="info-tip__btn" type="button" aria-expanded="false"
+                            aria-label="What is Reliability?">i</button>
+                    <span class="info-tip__body" role="tooltip">
+                      "Attendance, punctuality, and follow-through on scheduled sessions."
+                      Rated 1–10 after each session.
+                    </span>
+                  </span>
+                </th>
+                <th scope="col">
+                  Workload Balance
+                  <span class="info-tip">
+                    <button class="info-tip__btn" type="button" aria-expanded="false"
+                            aria-label="What is Workload Balance?">i</button>
+                    <span class="info-tip__body" role="tooltip">
+                      "Does this care arrangement feel sustainable and appropriately
+                      supported for everyone involved?" Low scores can be an early
+                      warning sign of caregiver burnout. Rated 1–10 after each session.
+                    </span>
+                  </span>
+                </th>
                 <th scope="col">Avg</th>
                 <th scope="col">Notes</th>
               </tr>
@@ -301,4 +437,63 @@
   {% endif %}
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  /* ── Info-tip tap/click toggle for touch devices ─────────────────────── */
+  document.addEventListener('DOMContentLoaded', function () {
+    var allTips = document.querySelectorAll('.info-tip');
+
+    allTips.forEach(function (tip) {
+      var btn = tip.querySelector('.info-tip__btn');
+      if (!btn) return;
+
+      // Toggle this tip on button click/tap
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var isOpen = tip.classList.toggle('is-open');
+        btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+        // Close all other open tips
+        allTips.forEach(function (other) {
+          if (other !== tip && other.classList.contains('is-open')) {
+            other.classList.remove('is-open');
+            var otherBtn = other.querySelector('.info-tip__btn');
+            if (otherBtn) otherBtn.setAttribute('aria-expanded', 'false');
+          }
+        });
+      });
+    });
+
+    // Close all tips when clicking anywhere else on the page
+    document.addEventListener('click', function () {
+      allTips.forEach(function (tip) {
+        if (tip.classList.contains('is-open')) {
+          tip.classList.remove('is-open');
+          var btn = tip.querySelector('.info-tip__btn');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+
+    // Close all tips on Escape key
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        allTips.forEach(function (tip) {
+          if (tip.classList.contains('is-open')) {
+            tip.classList.remove('is-open');
+            var btn = tip.querySelector('.info-tip__btn');
+            if (btn) {
+              btn.setAttribute('aria-expanded', 'false');
+              btn.focus(); // return focus to the button that opened the tip
+            }
+          }
+        });
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

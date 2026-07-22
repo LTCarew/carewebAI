@@ -1,0 +1,5 @@
+# Development/test-only dependencies (not required in production)
+# Install with: pip install -r requirements-dev.txt
+
+# Browser UI smoke tests (uses Selenium Manager — auto-fetches msedgedriver/chromedriver)
+selenium==4.33.0

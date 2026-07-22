@@ -95,81 +95,21 @@ Behaviour:
         <td class="stability-cell">
           {% if match.stability_snapshot %}
             {% with snap=match.stability_snapshot %}
-            {# Native <details>/<summary> — keyboard accessible, no JS required #}
-            <details class="stability-details">
-              <summary
-                class="stability-status stability-status--{{ snap.status }}"
-                aria-label="Open stability details for {{ match.caregiver.user_profile.display_name }} and {{ match.client.user_profile.display_name }}"
-              >
+            <div class="stability-cell__inner">
+              {# Status badge links to the full detail page #}
+              <a href="{% url 'match_stability_detail' match.pk %}"
+                 class="stability-status stability-status--{{ snap.status }}"
+                 aria-label="View stability details for {{ match.caregiver.user_profile.display_name }} and {{ match.client.user_profile.display_name }}">
                 <span class="stability-status__dot" aria-hidden="true"></span>
                 <span>{{ snap.label }}</span>
-              </summary>
-
-              {# ── Expanded panel ────────────────────────────────────────── #}
-              <div class="stability-panel" role="region" aria-label="Stability snapshot for {{ match.caregiver.user_profile.display_name }} and {{ match.client.user_profile.display_name }}">
-                <h3 class="stability-panel__heading">
-                  Stability Snapshot
-                  <span class="stability-status stability-status--{{ snap.status }} stability-status--inline">
-                    <span class="stability-status__dot" aria-hidden="true"></span>
-                    <span>{{ snap.label }}</span>
-                  </span>
-                </h3>
-
-                {% if snap.score is not None %}
-                <p class="stability-panel__score">
-                  Demonstration score: <strong>{{ snap.score }}/100</strong>
-                </p>
-                {% endif %}
-
-                <dl class="stability-signals">
-                  <div class="stability-signals__row">
-                    <dt>Schedule consistency</dt>
-                    <dd>{{ snap.signals.schedule_consistency }}</dd>
-                  </div>
-                  <div class="stability-signals__row">
-                    <dt>Travel burden</dt>
-                    <dd>{{ snap.signals.travel_burden }}</dd>
-                  </div>
-                  <div class="stability-signals__row">
-                    <dt>Access alignment</dt>
-                    <dd>{{ snap.signals.access_alignment }}</dd>
-                  </div>
-                  <div class="stability-signals__row">
-                    <dt>Care continuity</dt>
-                    <dd>{{ snap.signals.care_continuity }}</dd>
-                  </div>
-                  <div class="stability-signals__row">
-                    <dt>Support flags</dt>
-                    <dd>{{ snap.signals.support_flags }}</dd>
-                  </div>
-                </dl>
-
-                <p class="stability-panel__explanation">{{ snap.explanation }}</p>
-
-                {# ── Flag for Stabilization Review action ─────────────────── #}
-                <div class="stability-panel__action" aria-live="polite">
-                  {% if snap.review_requested %}
-                    <p class="stability-panel__review-pending">
-                      ✅ Stabilization Review Requested
-                      {% if snap.review_requested_by_name %}
-                        <span class="is-size-7 has-text-grey"> by {{ snap.review_requested_by_name }}</span>
-                      {% endif %}
-                    </p>
-                  {% else %}
-                    <form method="post" action="{% url 'flag_stabilization_review' match.pk %}">
-                      {% csrf_token %}
-                      <button
-                        type="submit"
-                        class="button is-warning is-small stability-panel__flag-btn"
-                        aria-label="Flag relationship between {{ match.caregiver.user_profile.display_name }} and {{ match.client.user_profile.display_name }} for stabilization review"
-                      >
-                        🚩 Flag for Stabilization Review
-                      </button>
-                    </form>
-                  {% endif %}
-                </div>
-              </div>{# end stability-panel #}
-            </details>
+              </a>
+              {# Persistent flag badge — always visible when flagged #}
+              {% if snap.review_requested %}
+                <span class="stability-flag-badge" title="Flagged for Stabilization Review">
+                  🚩 <span class="is-sr-only">Flagged for review</span>
+                </span>
+              {% endif %}
+            </div>
             {% endwith %}
           {% else %}
             <span class="has-text-grey-light is-size-7">—</span>

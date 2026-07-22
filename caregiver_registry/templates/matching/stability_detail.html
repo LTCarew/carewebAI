@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}Stability Detail — {{ match.caregiver.user_profile.display_name }} &amp; {{ match.client.user_profile.display_name }}{% endblock %}
+{% block content %}
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="notification {% if message.tags == 'error' %}is-danger{% elif message.tags == 'warning' %}is-warning{% else %}is-info{% endif %} mb-4">
+      {{ message }}
+    </div>
+  {% endfor %}
+{% endif %}
+
+{# ── Page header ─────────────────────────────────────────────────────────── #}
+<div class="mb-5">
+  <nav class="breadcrumb is-small mb-2" aria-label="breadcrumbs">
+    <ul>
+      <li><a href="{% url 'org_dashboard' %}">Organization Dashboard</a></li>
+      <li class="is-active"><a href="#" aria-current="page">Stability Detail</a></li>
+    </ul>
+  </nav>
+
+  <h1 class="title is-2 mb-1">Relationship Stability Detail</h1>
+  <p class="subtitle is-5">
+    <strong>{{ match.caregiver.user_profile.display_name }}</strong>
+    <span class="has-text-grey mx-2">↔</span>
+    <strong>{{ match.client.user_profile.display_name }}</strong>
+  </p>
+</div>
+
+{# ── Snapshot overview card ───────────────────────────────────────────────── #}
+<div class="card app-card mb-5">
+  <div class="card-content">
+    <div class="level mb-4">
+      <div class="level-left">
+        <div>
+          <h2 class="title is-4 mb-1">Stability Snapshot</h2>
+          <p class="is-size-7 has-text-grey">
+            {% if snapshot.source == "ratings" %}Based on session rating data{% else %}Awaiting session ratings{% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="level-right">
+        <span class="stability-status stability-status--{{ snapshot.status }} stability-status--large"
+              aria-label="Stability: {{ snapshot.label }}">
+          <span class="stability-status__dot" aria-hidden="true"></span>
+          <span>{{ snapshot.label }}</span>
+        </span>
+      </div>
+    </div>
+
+    {% if snapshot.score is not None %}
+    <p class="mb-3">
+      <strong>Overall Score:</strong>
+      <span class="tag {% if snapshot.status == 'green' %}is-success{% elif snapshot.status == 'red' %}is-danger{% elif snapshot.status == 'none' %}is-light{% else %}is-warning{% endif %} ml-1">
+        {{ snapshot.score }}/100
+      </span>
+    </p>
+    {% endif %}
+
+    <p class="mb-4" style="color: var(--app-text-soft);">{{ snapshot.explanation }}</p>
+
+    {# ── 5-Signal breakdown ───────────────────────────────────────────────── #}
+    <h3 class="title is-6 mb-2">Relationship Signals</h3>
+    <div class="table-container mb-4">
+      <table class="table is-fullwidth is-narrow" aria-label="Stability signals">
+        <thead>
+          <tr>
+            <th scope="col">Signal</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Schedule Consistency</th>
+            <td>
+              <span class="tag {% if snapshot.signals.schedule_consistency == 'Good' %}is-success is-light{% elif snapshot.signals.schedule_consistency == 'Poor' %}is-danger is-light{% elif snapshot.signals.schedule_consistency == 'Not yet rated' %}is-light{% else %}is-warning is-light{% endif %}">
+                {{ snapshot.signals.schedule_consistency }}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Travel Burden</th>
+            <td>
+              <span class="tag {% if snapshot.signals.travel_burden == 'Low' %}is-success is-light{% elif snapshot.signals.travel_burden == 'High' %}is-danger is-light{% else %}is-warning is-light{% endif %}">
+                {{ snapshot.signals.travel_burden }}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Access Alignment</th>
+            <td>
+              <span class="tag {% if snapshot.signals.access_alignment == 'Aligned' %}is-success is-light{% elif snapshot.signals.access_alignment == 'Significant mismatch' %}is-danger is-light{% elif snapshot.signals.access_alignment == 'Not yet rated' %}is-light{% else %}is-warning is-light{% endif %}">
+                {{ snapshot.signals.access_alignment }}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Care Continuity</th>
+            <td>
+              <span class="tag {% if snapshot.signals.care_continuity == 'Stable' %}is-success is-light{% elif snapshot.signals.care_continuity == 'Frequent disruption' %}is-danger is-light{% elif snapshot.signals.care_continuity == 'Not yet rated' %}is-light{% else %}is-warning is-light{% endif %}">
+                {{ snapshot.signals.care_continuity }}
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Support Flags</th>
+            <td>
+              <span class="tag {% if snapshot.signals.support_flags == 'None' %}is-success is-light{% elif snapshot.signals.support_flags == 'Immediate review recommended' %}is-danger is-light{% else %}is-warning is-light{% endif %}">
+                {{ snapshot.signals.support_flags }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# ── Stabilization review flag status ─────────────────────────────────── #}
+    <div class="stability-flag-block">
+      {% if snapshot.review_requested %}
+        <div class="notification is-warning is-light">
+          <p class="mb-2">
+            <strong>🚩 This relationship is flagged for Stabilization Review.</strong>
+            {% if snapshot.review_requested_by_name %}
+              <span class="is-size-7 has-text-grey ml-1">Flagged by {{ snapshot.review_requested_by_name }}</span>
+            {% endif %}
+            {% if match.stabilization_review_requested_at %}
+              <span class="is-size-7 has-text-grey ml-1">on {{ match.stabilization_review_requested_at|date:"N j, Y, g:i a" }}</span>
+            {% endif %}
+          </p>
+          <form method="post" action="{% url 'unflag_stabilization_review' match.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="button is-warning is-small"
+                    aria-label="Remove stabilization review flag for {{ match.caregiver.user_profile.display_name }} and {{ match.client.user_profile.display_name }}">
+              ✅ Remove Flag
+            </button>
+          </form>
+        </div>
+      {% else %}
+        <div class="notification is-light">
+          <p class="mb-2 has-text-grey">This relationship has not been flagged for stabilization review.</p>
+          <form method="post" action="{% url 'flag_stabilization_review' match.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="button is-warning is-small"
+                    aria-label="Flag relationship between {{ match.caregiver.user_profile.display_name }} and {{ match.client.user_profile.display_name }} for stabilization review">
+              🚩 Flag for Stabilization Review
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Rating history by schedule entry ─────────────────────────────────────── #}
+{% if entry_histories %}
+  <h2 class="title is-4 mb-3">📋 Session Rating History by Schedule Slot</h2>
+  <p class="is-size-7 has-text-grey mb-4">
+    Ratings submitted by both the person looking for support (client) and the person providing support (careworker)
+    for each recurring scheduled session. Newest sessions shown first. Metrics are rated on a 1–10 scale.
+  </p>
+
+  {% for item in entry_histories %}
+  <div class="card app-card mb-4">
+    <div class="card-content">
+      <h3 class="title is-5 mb-1">
+        {{ item.entry.get_day_of_week_display }}
+        &nbsp;
+        <span class="has-text-grey is-size-6">
+          {{ item.entry.start_time|time:"g:i A" }} – {{ item.entry.end_time|time:"g:i A" }}
+        </span>
+      </h3>
+
+      {% if item.sessions %}
+        <div class="table-container">
+          <table class="table is-fullwidth is-striped is-hoverable" aria-label="Ratings for {{ item.entry.get_day_of_week_display }} {{ item.entry.start_time|time:'g:i A' }}">
+            <thead>
+              <tr>
+                <th scope="col">Session Date</th>
+                <th scope="col">Rated By</th>
+                <th scope="col">Care Fit &amp; Respect</th>
+                <th scope="col">Communication</th>
+                <th scope="col">Reliability</th>
+                <th scope="col">Workload Balance</th>
+                <th scope="col">Avg</th>
+                <th scope="col">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for session in item.sessions %}
+                {# ── Client row ─── #}
+                {% if session.client %}
+                  {% with r=session.client %}
+                  <tr>
+                    <td>{{ session.date|date:"N j, Y" }}</td>
+                    <td>
+                      <span class="tag is-info is-light is-small">
+                        Person Seeking Support
+                      </span>
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.care_fit_respect %}
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.communication_coordination %}
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.reliability_consistency %}
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.workload_support_balance %}
+                    </td>
+                    <td>
+                      {% with avg=r.care_fit_respect|add:r.communication_coordination|add:r.reliability_consistency|add:r.workload_support_balance %}
+                        {# Django template doesn't support division natively; approximate with display #}
+                        <span class="tag {% if avg >= 30 %}is-success{% elif avg >= 20 %}is-warning{% else %}is-danger{% endif %} is-light">
+                          {{ avg|floatformat:0 }}/40
+                        </span>
+                      {% endwith %}
+                    </td>
+                    <td class="stability-notes-cell">
+                      {% if r.notes %}
+                        <span class="is-size-7">{{ r.notes }}</span>
+                      {% else %}
+                        <span class="has-text-grey-light is-size-7">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endwith %}
+                {% endif %}
+                {# ── Caregiver row ─── #}
+                {% if session.caregiver %}
+                  {% with r=session.caregiver %}
+                  <tr>
+                    <td>{{ session.date|date:"N j, Y" }}</td>
+                    <td>
+                      <span class="tag is-link is-light is-small">
+                        Person Providing Support
+                      </span>
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.care_fit_respect %}
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.communication_coordination %}
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.reliability_consistency %}
+                    </td>
+                    <td>
+                      {% include "matching/_score_cell.html" with score=r.workload_support_balance %}
+                    </td>
+                    <td>
+                      {% with avg=r.care_fit_respect|add:r.communication_coordination|add:r.reliability_consistency|add:r.workload_support_balance %}
+                        <span class="tag {% if avg >= 30 %}is-success{% elif avg >= 20 %}is-warning{% else %}is-danger{% endif %} is-light">
+                          {{ avg|floatformat:0 }}/40
+                        </span>
+                      {% endwith %}
+                    </td>
+                    <td class="stability-notes-cell">
+                      {% if r.notes %}
+                        <span class="is-size-7">{{ r.notes }}</span>
+                      {% else %}
+                        <span class="has-text-grey-light is-size-7">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endwith %}
+                {% endif %}
+                {# ── Spacer row between sessions ─── #}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="has-text-grey-light is-italic is-size-7">No ratings have been submitted for this slot yet.</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+{% elif schedule %}
+  <div class="notification is-info is-light">
+    <p>A schedule exists for this relationship, but no session ratings have been submitted yet.</p>
+    <p class="is-size-7 mt-1 has-text-grey">Ratings will appear here as sessions are completed and reviewed.</p>
+  </div>
+
+{% else %}
+  <div class="notification is-light">
+    <p>No approved schedule was found for this match. Stability status will become available once sessions are scheduled and ratings are submitted.</p>
+  </div>
+{% endif %}
+
+{# ── Footer navigation ────────────────────────────────────────────────────── #}
+<div class="buttons mt-5">
+  <a href="{% url 'org_dashboard' %}" class="button is-light">← Back to Dashboard</a>
+  {% if match.caregiver %}
+    <a href="{% url 'caregiver_detail' match.caregiver.pk %}" class="button is-light is-small">View Careworker Profile</a>
+  {% endif %}
+  {% if match.client %}
+    <a href="{% url 'client_detail' match.client.pk %}" class="button is-light is-small">View Client Profile</a>
+  {% endif %}
+</div>
+
+{% endblock %}

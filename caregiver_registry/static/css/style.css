@@ -752,17 +752,20 @@ ul.errorlist li,
    WCAG AA contrast is preserved in both light and dark themes.
 */
 :root {
-    --stability-green:  #16a34a;   /* same green as Bulma is-success solid */
-    --stability-yellow: #a16207;   /* amber — darker than #f2e94e for contrast */
-    --stability-red:    var(--app-danger);  /* #da3e52 — reuses existing token */
+    --stability-green:   #16a34a;   /* same green as Bulma is-success solid */
+    --stability-yellow:  #a16207;   /* amber — darker than #f2e94e for contrast */
+    --stability-red:     var(--app-danger);  /* #da3e52 — reuses existing token */
+    --stability-neutral: #64748b;   /* slate-500 — used for "Not Yet Rated" */
 
     --stability-green-bg:  #f0fdf4;
     --stability-yellow-bg: #fefce8;
     --stability-red-bg:    #fff1f2;
+    --stability-none-bg:   #f1f5f9;
 
     --stability-green-border:  #86efac;
     --stability-yellow-border: #fde047;
     --stability-red-border:    #fda4af;
+    --stability-none-border:   #cbd5e1;
 
     --stability-panel-bg:    var(--app-surface);
     --stability-panel-border: var(--app-border);
@@ -819,6 +822,14 @@ ul.errorlist li,
     background-color: var(--stability-red);
 }
 
+/* None / Not Yet Rated */
+.stability-status--none {
+    color: var(--stability-neutral);
+}
+.stability-status--none .stability-status__dot {
+    background-color: var(--stability-neutral);
+}
+
 /* Inline variant used inside the panel heading */
 .stability-status--inline {
     font-size: 0.8rem;
@@ -831,7 +842,51 @@ ul.errorlist li,
 
 .stability-cell {
     min-width: 8rem;
-    vertical-align: top;
+    vertical-align: middle;
+}
+
+/* Flex wrapper so status link + flag badge sit side-by-side */
+.stability-cell__inner {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+}
+
+/* The status link in the table — behaves like the old badge but is clickable */
+.stability-cell__inner .stability-status {
+    text-decoration: none;
+}
+.stability-cell__inner .stability-status:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Persistent flag badge shown whenever a match is flagged for review */
+.stability-flag-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    line-height: 1;
+    background-color: #fef9c3;
+    border: 1px solid #fde047;
+    border-radius: 4px;
+    padding: 0.15rem 0.35rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Screen-reader-only utility (mirrors Bulma's .is-sr-only) */
+.is-sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
 }
 
 /* Subtle left-border accent on the table row — does NOT fill the whole row */
@@ -843,6 +898,9 @@ tr:has(.stability-status--yellow) {
 }
 tr:has(.stability-status--green) {
     border-left: 3px solid var(--stability-green);
+}
+tr:has(.stability-status--none) {
+    border-left: 3px solid var(--stability-none-border);
 }
 
 /* ── <details> disclosure wrapper ────────────────────────────────────────── */
@@ -951,6 +1009,38 @@ tr:has(.stability-status--green) {
         border-radius: 12px 12px 0 0;
         box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
     }
+}
+
+/* ── Stability Detail page specifics ────────────────────────────────────── */
+
+/* Larger status badge in the detail page header */
+.stability-status--large {
+    font-size: 1.1rem;
+    font-weight: 700;
+    gap: 0.4em;
+}
+.stability-status--large .stability-status__dot {
+    width: 0.75em;
+    height: 0.75em;
+}
+
+/* Flag block on the detail page */
+.stability-flag-block .notification {
+    margin-bottom: 0;
+}
+
+/* Notes cell in the session history table — allow wrapping */
+.stability-notes-cell {
+    max-width: 16rem;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Score badges in the detail table */
+.score-badge {
+    font-weight: 700;
+    min-width: 3.2rem;
+    justify-content: center;
 }
 
 /*

@@ -4,25 +4,28 @@ Stability Snapshot service for active caregiver–client relationships.
 This module provides ``get_stability_snapshot(match)`` which returns a
 deterministic, rule-based stability assessment for a single Match record.
 
-Scoring strategy (Option A with Option B fallback):
+Scoring strategy — ratings only:
 
-  Option A — existing ScheduleEntryRating data (real experience signals)
-    Ratings use a 1–10 scale across four shared metrics:
-      care_fit_respect, communication_coordination,
-      reliability_consistency, workload_support_balance
+  The Stability Snapshot is based exclusively on ``ScheduleEntryRating`` data
+  submitted by the caregiver and client after scheduled sessions.
 
-    Status thresholds (average across all ratings for this relationship):
-      ≥ 7.5  → green  (Stable)
-      ≥ 5.0  → yellow (Monitor)
-      < 5.0  → red    (At Risk)
+  Ratings use a 1–10 scale across four shared metrics:
+    care_fit_respect, communication_coordination,
+    reliability_consistency, workload_support_balance
 
-  Option B — match_score fallback when no ratings exist yet
-    Uses the same 70 / 40 thresholds already displayed in _match_table.html
-    so the UI is internally consistent:
-      ≥ 70  → green
-      ≥ 40  → yellow
-      < 40  → red
-    Explanation explicitly labels this as a demonstration estimate.
+  Status thresholds (average across all ratings for this relationship):
+    ≥ 7.5  → green  (Stable)
+    ≥ 5.0  → yellow (Monitor)
+    < 5.0  → red    (At Risk)
+
+  No ratings yet → "none" (Not Yet Rated)
+    Shown as a neutral gray badge. The snapshot explicitly communicates
+    that no session data has been submitted yet and that stability status
+    cannot be assessed until real ratings are available.
+
+  The match compatibility score (``match_score``) is intentionally NOT used
+  in any stability assessment path. Compatibility at match-creation time is a
+  separate concept from experienced stability over time.
 
 Results are deterministic across requests for the same data.
 No AI API calls are made at render time.
@@ -34,13 +37,9 @@ from django.db.models import Avg
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
 
-# Option A: real rating averages (scale 1–10)
+# Rating averages (scale 1–10)
 _RATING_GREEN  = 7.5
 _RATING_YELLOW = 5.0
-
-# Option B: match-score fallback (scale 0–100)
-_SCORE_GREEN  = 70
-_SCORE_YELLOW = 40
 
 
 # ── Public interface ──────────────────────────────────────────────────────────
@@ -55,15 +54,15 @@ def get_stability_snapshot(match):
     Returns a dict::
 
         {
-            "status":  "green" | "yellow" | "red",
-            "label":   "Stable" | "Monitor" | "At Risk",
-            "score":   int (0–100, may be None when truly unknown),
-            "source":  "ratings" | "match_score" | "neutral",
+            "status":  "green" | "yellow" | "red" | "none",
+            "label":   "Stable" | "Monitor" | "At Risk" | "Not Yet Rated",
+            "score":   int (0–100) | None,
+            "source":  "ratings" | "no_ratings",
             "signals": {
-                "schedule_consistency": "Good" | "Moderate" | "Poor",
+                "schedule_consistency": "Good" | "Moderate" | "Poor" | "Not yet rated",
                 "travel_burden":        "Low"  | "Moderate" | "High",
-                "access_alignment":     "Aligned" | "Partial mismatch" | "Significant mismatch",
-                "care_continuity":      "Stable" | "Some disruption" | "Frequent disruption",
+                "access_alignment":     "Aligned" | "Partial mismatch" | "Significant mismatch" | "Not yet rated",
+                "care_continuity":      "Stable" | "Some disruption" | "Frequent disruption" | "Not yet rated",
                 "support_flags":        "None"   | "Follow-up suggested" | "Immediate review recommended",
             },
             "explanation": str,
@@ -106,10 +105,11 @@ def get_stability_snapshot(match):
         signals = _signals_from_ratings(agg, avg_overall, match)
 
     else:
-        # No ratings yet — fall back to match compatibility score
-        status, label, score, explanation = _derive_from_score(match)
-        source = "match_score" if match.match_score is not None else "neutral"
-        signals = _signals_from_score(match)
+        # No ratings yet — status cannot be assessed from real experience data.
+        # We intentionally do NOT use match_score as a proxy.
+        status, label, score, explanation = _derive_no_ratings()
+        source = "no_ratings"
+        signals = _signals_no_ratings(match)
 
     # Override support_flags if staff have already flagged this relationship
     if match.stabilization_review_requested:
@@ -219,100 +219,43 @@ def _signals_from_ratings(agg, avg_overall, match):
     }
 
 
-# ── Private helpers: match-score fallback path ────────────────────────────────
+# ── Private helpers: no-ratings path ─────────────────────────────────────────
 
-def _derive_from_score(match):
-    """Classify status from compatibility score when no ratings exist yet."""
-    ms = match.match_score
+def _derive_no_ratings():
+    """
+    Return a neutral 'Not Yet Rated' snapshot when no session ratings exist.
 
-    if ms is None:
-        status = "yellow"
-        label  = "Monitor"
-        score  = None
-        explanation = (
-            "No session ratings have been submitted yet for this relationship. "
-            "This is a demonstration placeholder based on initial match data. "
-            "Status will update automatically as ratings are submitted."
-        )
-    elif ms >= _SCORE_GREEN:
-        status = "green"
-        label  = "Stable"
-        score  = round(ms)
-        explanation = (
-            "No session ratings have been submitted yet. "
-            "This demonstration status is based on a strong initial match compatibility score "
-            f"({round(ms)}/100) and placeholder stability rules. "
-            "It will update as real session data becomes available."
-        )
-    elif ms >= _SCORE_YELLOW:
-        status = "yellow"
-        label  = "Monitor"
-        score  = round(ms)
-        explanation = (
-            "No session ratings have been submitted yet. "
-            "This demonstration status is based on a moderate initial match compatibility score "
-            f"({round(ms)}/100) and placeholder stability rules. "
-            "Staff may want to check in once sessions begin."
-        )
-    else:
-        status = "red"
-        label  = "At Risk"
-        score  = round(ms)
-        explanation = (
-            "No session ratings have been submitted yet. "
-            "This demonstration status is based on a lower initial match compatibility score "
-            f"({round(ms)}/100) and placeholder stability rules. "
-            "A follow-up conversation before sessions begin is recommended."
-        )
-
+    The match compatibility score is intentionally not used here.
+    Stability is a measure of lived experience, not initial compatibility.
+    """
+    status = "none"
+    label  = "Not Yet Rated"
+    score  = None
+    explanation = (
+        "No session ratings have been submitted yet for this relationship. "
+        "Stability status is based on the ratings that caregivers and clients "
+        "submit after each scheduled appointment. "
+        "This section will update automatically once ratings are available."
+    )
     return status, label, score, explanation
 
 
-def _signals_from_score(match):
-    """Build signal labels when only the match_score and match_details are available."""
-    ms      = match.match_score or 0.0
-    details = match.match_details or {}
+def _signals_no_ratings(match):
+    """
+    Build signals when no ratings exist yet.
 
-    # Schedule consistency — from availability overlap in match_details
-    avail   = details.get("availability", {})
-    avail_score = avail.get("score", 0.0)
-    if avail_score >= 14.0:       # ≥ 70 % of 20-pt max
-        schedule_consistency = "Good"
-    elif avail_score >= 8.0:      # ≥ 40 % of 20-pt max
-        schedule_consistency = "Moderate"
-    else:
-        schedule_consistency = "Poor"
-
-    # Travel burden — from distance stored in match_details.location
+    Travel burden is still shown — it is derived from a factual geographic
+    distance, not a compatibility score. All other signals that depend on
+    real session experience are labeled 'Not yet rated'.
+    """
     travel_burden = _travel_burden_from_match(match)
 
-    # Access alignment — from tag/experience overlap score
-    tag = details.get("tag_overlap", {})
-    tag_score = tag.get("score", 0.0)
-    if tag_score >= 28.0:         # ≥ 70 % of 40-pt max
-        access_alignment = "Aligned"
-    elif tag_score >= 16.0:       # ≥ 40 % of 40-pt max
-        access_alignment = "Partial mismatch"
-    else:
-        access_alignment = "Significant mismatch"
-
-    # Care continuity — from overall match score
-    if ms >= _SCORE_GREEN:
-        care_continuity = "Stable"
-    elif ms >= _SCORE_YELLOW:
-        care_continuity = "Some disruption"
-    else:
-        care_continuity = "Frequent disruption"
-
-    # Support flags — neutral until sessions begin
-    support_flags = "None"
-
     return {
-        "schedule_consistency": schedule_consistency,
+        "schedule_consistency": "Not yet rated",
         "travel_burden":        travel_burden,
-        "access_alignment":     access_alignment,
-        "care_continuity":      care_continuity,
-        "support_flags":        support_flags,
+        "access_alignment":     "Not yet rated",
+        "care_continuity":      "Not yet rated",
+        "support_flags":        "None",
     }
 
 

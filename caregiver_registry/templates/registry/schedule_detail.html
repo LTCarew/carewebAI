@@ -148,6 +148,9 @@
             {% if is_caregiver or is_support %}
               <th scope="col">Your Action</th>
             {% endif %}
+            {% if is_client or is_caregiver %}
+              <th scope="col">Rate Experience</th>
+            {% endif %}
           </tr>
         </thead>
         <tbody>
@@ -240,6 +243,19 @@
             </td>
             {% elif not is_caregiver and not is_support %}
             <td></td>
+            {% endif %}
+            {% if is_client or is_caregiver %}
+            <td>
+              {% if entry.is_fully_approved %}
+                <a href="{% url 'schedule_entry_rate' entry.pk %}"
+                   class="button is-link is-small"
+                   aria-label="Rate your experience for {{ entry.get_day_of_week_display }}">
+                  ⭐ Rate
+                </a>
+              {% else %}
+                <span class="is-size-7 has-text-grey-light" title="Entry must be fully approved before it can be rated">Pending approval</span>
+              {% endif %}
+            </td>
             {% endif %}
           </tr>
           {% endfor %}

@@ -58,6 +58,111 @@
   </div>
 </div>
 
+<!-- My Approved Schedules — per-entry view with Rate shortcut -->
+<div class="card app-card mb-4">
+  <div class="card-content">
+    <div class="level mb-3">
+      <div class="level-left">
+        <h2 class="title is-5">✅ My Approved Schedule</h2>
+      </div>
+    </div>
+
+    {% for sched in approved_schedules %}
+      <div class="box mb-4" style="border-left: 4px solid #48c78e;">
+        <div class="level is-mobile mb-2">
+          <div class="level-left">
+            <div>
+              <p class="has-text-weight-semibold">
+                Careworker:
+                <a href="{% url 'schedule_detail' sched.pk %}">
+                  {{ sched.caregiver.user_profile.display_name }}
+                </a>
+              </p>
+              <p class="is-size-7 has-text-grey">
+                Starts {{ sched.start_date|date:"N j, Y" }}
+                {% if sched.end_date %} &mdash; ends {{ sched.end_date|date:"N j, Y" }}{% else %} (ongoing){% endif %}
+                &nbsp;&middot;&nbsp; {{ sched.get_frequency_display }}
+                {% if sched.support_person %}
+                  &nbsp;&middot;&nbsp; Support: {{ sched.support_person.user_profile.display_name }}
+                {% endif %}
+              </p>
+            </div>
+          </div>
+          <div class="level-right">
+            <a href="{% url 'schedule_detail' sched.pk %}" class="button is-success is-light is-small">
+              View Details
+            </a>
+          </div>
+        </div>
+
+        <div class="table-container" role="region" aria-label="Approved schedule entries for {{ sched.caregiver.user_profile.display_name }}">
+          <table class="table is-fullwidth is-striped is-hoverable is-narrow">
+            <thead>
+              <tr>
+                <th scope="col">Day</th>
+                <th scope="col">Start</th>
+                <th scope="col">End</th>
+                <th scope="col">Status</th>
+                {% if sched.support_person %}
+                  <th scope="col">Support Person Status</th>
+                {% endif %}
+                <th scope="col">Rate Experience</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in sched.entries.all %}
+              <tr>
+                <td><strong>{{ entry.get_day_of_week_display }}</strong></td>
+                <td>{{ entry.start_time|time:"g:i A" }}</td>
+                <td>{{ entry.end_time|time:"g:i A" }}</td>
+                <td>
+                  {% if entry.caregiver_status == "approved" %}
+                    <span class="tag is-success is-light">Approved</span>
+                  {% elif entry.caregiver_status == "rejected" %}
+                    <span class="tag is-danger is-light">Rejected</span>
+                  {% else %}
+                    <span class="tag is-warning is-light">Pending</span>
+                  {% endif %}
+                </td>
+                {% if sched.support_person %}
+                <td>
+                  {% if entry.support_person_status == "approved" %}
+                    <span class="tag is-success is-light">Approved</span>
+                  {% elif entry.support_person_status == "rejected" %}
+                    <span class="tag is-danger is-light">Rejected</span>
+                  {% else %}
+                    <span class="tag is-warning is-light">Pending</span>
+                  {% endif %}
+                </td>
+                {% endif %}
+                <td>
+                  {% if entry.is_fully_approved %}
+                    <a href="{% url 'schedule_entry_rate' entry.pk %}"
+                       class="button is-link is-small"
+                       aria-label="Rate your experience for {{ entry.get_day_of_week_display }}">
+                      ⭐ Rate
+                    </a>
+                  {% else %}
+                    <span class="is-size-7 has-text-grey-light">Pending approval</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+                <tr><td colspan="5" class="has-text-grey-light is-italic">No entries.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% empty %}
+      <p class="has-text-grey-light is-italic">
+        No approved schedules yet. Schedules become approved once your careworker (and support
+        person, if assigned) have approved all entries.
+      </p>
+    {% endfor %}
+  </div>
+</div>
+
 <!-- My Schedules -->
 <div class="card app-card mb-4">
   <div class="card-content">

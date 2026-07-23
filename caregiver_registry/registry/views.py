@@ -453,6 +453,11 @@ def client_dashboard(request):
     ).prefetch_related("entries").order_by("-created_at")
     my_schedules = Paginator(my_schedules_qs, 10).get_page(request.GET.get("schedules_page", 1))
 
+    # Approved schedules only — shown in the per-entry view at the top (for Rate shortcuts)
+    approved_schedules = list(
+        my_schedules_qs.filter(status="approved")
+    )
+
     return render(request, "registry/client_dashboard.html", {
         "client_profile": client_profile,
         "pending_my_approval": pending_my_approval,
@@ -462,6 +467,7 @@ def client_dashboard(request):
         "unread_notifications": unread_notifications,
         "coordinators": coordinators,
         "my_schedules": my_schedules,
+        "approved_schedules": approved_schedules,
     })
 
 
@@ -1804,6 +1810,78 @@ def _is_admin_or_staff(request):
 # Schedule Entry Rating Views
 # =============================================================================
 
+def _generate_ratable_dates(schedule, entry, user_profile):
+    """
+    Return a list of (iso_str, label_str) tuples representing valid session
+    dates for *entry* that:
+
+    1. Fall on the correct weekday for entry.day_of_week
+    2. Are >= schedule.start_date
+    3. Are <= min(today, schedule.end_date)  [no future dates; no dates past end]
+    4. Respect the schedule's recurrence frequency
+    5. Have NOT already been rated by this user for this entry
+
+    Results are sorted most-recent first so the most recent unrated session
+    appears at the top of the dropdown.
+    """
+    from datetime import date, timedelta
+
+    _WEEKDAY_MAP = {
+        "monday": 0, "tuesday": 1, "wednesday": 2,
+        "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
+    }
+
+    target_weekday = _WEEKDAY_MAP.get(entry.day_of_week)
+    if target_weekday is None:
+        return []
+
+    # ── Determine interval in days ────────────────────────────────────────────
+    if schedule.frequency == "weekly":
+        interval_days = 7
+    elif schedule.frequency == "biweekly":
+        interval_days = 14
+    elif schedule.frequency == "custom" and schedule.custom_interval_weeks:
+        interval_days = schedule.custom_interval_weeks * 7
+    else:
+        interval_days = 7  # safe fallback
+
+    # ── Find the first valid occurrence on or after start_date ───────────────
+    start = schedule.start_date
+    days_ahead = (target_weekday - start.weekday()) % 7
+    first_occurrence = start + timedelta(days=days_ahead)
+
+    # ── Determine the upper bound ─────────────────────────────────────────────
+    today = date.today()
+    upper = today
+    if schedule.end_date and schedule.end_date < upper:
+        upper = schedule.end_date
+
+    # ── Already-rated dates by this user for this entry ───────────────────────
+    from .models import ScheduleEntryRating
+    already_rated = set(
+        ScheduleEntryRating.objects.filter(
+            schedule_entry=entry,
+            rater_profile=user_profile,
+        ).values_list("rating_date", flat=True)
+    )
+
+    # ── Walk forward generating occurrences ──────────────────────────────────
+    occurrences = []
+    cursor = first_occurrence
+    while cursor <= upper:
+        if cursor not in already_rated:
+            occurrences.append(cursor)
+        cursor += timedelta(days=interval_days)
+
+    # Most-recent first
+    occurrences.sort(reverse=True)
+
+    return [
+        (d.isoformat(), f"{d.strftime('%A, %B')} {d.day}, {d.year}")
+        for d in occurrences
+    ]
+
+
 @login_required
 def schedule_entry_rate(request, entry_pk):
     """
@@ -1813,7 +1891,6 @@ def schedule_entry_rate(request, entry_pk):
     """
     from .models import ScheduleEntry, ScheduleEntryRating
     from .forms import ScheduleEntryRatingForm
-    from django.db.models import Avg
 
     entry = get_object_or_404(
         ScheduleEntry.objects.select_related(
@@ -1854,7 +1931,10 @@ def schedule_entry_rate(request, entry_pk):
         )
         return redirect("schedule_detail", pk=schedule.pk)
 
-    # ── Existing rating by this user for this entry (if any) for pre-fill ────
+    # ── Compute valid, unrated date choices ───────────────────────────────────
+    date_choices = _generate_ratable_dates(schedule, entry, user_profile)
+
+    # ── Existing ratings by this user for this entry (for history table) ─────
     existing_ratings = ScheduleEntryRating.objects.filter(
         schedule_entry=entry,
         rater_profile=user_profile,
@@ -1862,7 +1942,7 @@ def schedule_entry_rate(request, entry_pk):
 
     # ── Handle form ───────────────────────────────────────────────────────────
     if request.method == "POST":
-        form = ScheduleEntryRatingForm(request.POST, entry=entry)
+        form = ScheduleEntryRatingForm(request.POST, entry=entry, date_choices=date_choices)
         if form.is_valid():
             cd = form.cleaned_data
             rating, created = ScheduleEntryRating.objects.update_or_create(
@@ -1882,10 +1962,9 @@ def schedule_entry_rate(request, entry_pk):
             messages.success(request, f"Rating {verb} for {entry.get_day_of_week_display()}.")
             return redirect("schedule_detail", pk=schedule.pk)
     else:
-        form = ScheduleEntryRatingForm(entry=entry)
+        form = ScheduleEntryRatingForm(entry=entry, date_choices=date_choices)
 
     # ── Context ───────────────────────────────────────────────────────────────
-    # Counterpart name (show who you're rating with)
     if rater_role == "client":
         counterpart_name = schedule.caregiver.user_profile.display_name
     else:
@@ -1898,6 +1977,7 @@ def schedule_entry_rate(request, entry_pk):
         "rater_role": rater_role,
         "counterpart_name": counterpart_name,
         "existing_ratings": existing_ratings,
+        "has_ratable_dates": bool(date_choices),
     })
 
 

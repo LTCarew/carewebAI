@@ -1,0 +1,84 @@
+<div class="card app-card">
+  <div class="card-content">
+    {% if match_direction == "find_clients" %}
+      <h2 class="title is-5">Matching Clients by Care Tag</h2>
+      <p class="is-size-7 has-text-grey mb-4">
+        These people share at least one selected care criterion. This transparent filter does not rank people or make a compatibility decision.
+      </p>
+    {% else %}
+      <h2 class="title is-5">Matching Careworkers by Care Tag</h2>
+      <p class="is-size-7 has-text-grey mb-4">
+        These careworkers list at least one selected skill. This transparent filter does not rank people or make a compatibility decision.
+      </p>
+    {% endif %}
+
+    <div class="notification is-light mb-4" style="border-left:4px solid #48c78e;">
+      <strong>Criteria-based view:</strong> Review the shared tags first. Use <strong>✨ AI Match</strong> when you want ranked suggestions, a factor breakdown, and plain-language reasoning.
+    </div>
+
+    <div class="table-container" role="region" aria-label="Criteria match results">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Shared selected tags</th>
+            <th scope="col">Human-controlled next step</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in results %}
+          <tr>
+            <td>
+              {% if match_direction == "find_clients" %}
+                <a href="{% url 'client_detail' result.client.pk %}">{{ result.client.user_profile.display_name }}</a>
+                <br><span class="is-size-7 has-text-grey">{{ result.client.user_profile.city|default:"" }}</span>
+              {% else %}
+                <a href="{% url 'caregiver_detail' result.caregiver.pk %}">{{ result.caregiver.user_profile.display_name }}</a>
+                <br><span class="is-size-7 has-text-grey">{{ result.caregiver.user_profile.city|default:"" }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% for key in result.criteria_matches %}
+                <span class="tag is-success is-light is-small">#{{ key }}</span>
+              {% empty %}
+                <span class="has-text-grey-light is-size-7">No selected tag restriction</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% if role == "caregiver" and match_direction == "find_clients" %}
+                <form method="post" action="{% url 'caregiver_request_match' result.client.pk %}">
+                  {% csrf_token %}
+                  {% for tid in selected_tag_ids %}<input type="hidden" name="tag_ids" value="{{ tid }}">{% endfor %}
+                  <button type="submit" class="button is-primary is-small">Request Match</button>
+                </form>
+              {% elif role == "client" and match_direction == "find_caregivers" %}
+                <form method="post" action="{% url 'client_request_match' result.caregiver.pk %}">
+                  {% csrf_token %}
+                  {% for tid in selected_tag_ids %}<input type="hidden" name="tag_ids" value="{{ tid }}">{% endfor %}
+                  <button type="submit" class="button is-primary is-small">Request Match</button>
+                </form>
+              {% elif role == "staff" or role == "admin" %}
+                <form method="post" action="{% url 'staff_create_match' %}">
+                  {% csrf_token %}
+                  {% if match_direction == "find_clients" %}
+                    <input type="hidden" name="caregiver_id" value="{{ selected_caregiver.pk }}">
+                    <input type="hidden" name="client_id" value="{{ result.client.pk }}">
+                  {% else %}
+                    <input type="hidden" name="caregiver_id" value="{{ result.caregiver.pk }}">
+                    <input type="hidden" name="client_id" value="{{ selected_client.pk }}">
+                  {% endif %}
+                  {% for tid in selected_tag_ids %}<input type="hidden" name="tag_ids" value="{{ tid }}">{% endfor %}
+                  <button type="submit" class="button is-primary is-small">Propose Match</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="has-text-grey-light is-italic">No people matched the selected tags.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include "includes/_pagination.html" with page_obj=results page_param="page" %}
+  </div>
+</div>

@@ -18,10 +18,15 @@ Optional context (staff only):
 
     {# ── Section heading ── #}
     {% if match_direction == "find_clients" %}
-    <h2 class="title is-5">✨ AI Matching — Clients</h2>
+    <h2 class="title is-5">✨ AI-Assisted Matching — Ranked Clients</h2>
     {% else %}
-    <h2 class="title is-5">✨ AI Matching — Careworkers</h2>
+    <h2 class="title is-5">✨ AI-Assisted Matching — Ranked Careworkers</h2>
     {% endif %}
+
+    <div class="notification is-info is-light mb-4" style="border-left:4px solid #3e8ed0;">
+      <strong>Decision support, not an automatic decision.</strong>
+      The AI compares structured profile information, preserves the underlying factor scores, and explains strengths and concerns for human review. Participants and staff remain in control of the next step.
+    </div>
 
     {# ── Score key ── #}
     <div class="notification is-light mb-4 p-4" style="border-left: 4px solid #7e6b8f;">
@@ -66,7 +71,8 @@ Optional context (staff only):
             <th scope="col">Name</th>
             <th scope="col">Score</th>
             <th scope="col">Matched Tags</th>
-            <th scope="col">AI Reasoning</th>
+            <th scope="col">Factor breakdown</th>
+            <th scope="col">AI reasoning</th>
             <th scope="col">Action</th>
           </tr>
         </thead>
@@ -126,7 +132,24 @@ Optional context (staff only):
             </td>
 
             {# ── AI Reasoning ── #}
-            <td class="is-size-7">{{ result.ai_reasoning }}</td>
+            <td class="is-size-7" style="min-width:210px;">
+              <div class="mb-1"><span>Care tags</span> <strong>{{ result.details.tag_overlap.score|default:"0" }}/40</strong></div>
+              <progress class="progress is-small is-info mb-2" value="{{ result.details.tag_overlap.score|default:"0" }}" max="40"></progress>
+              <div class="mb-1"><span>Availability</span> <strong>{{ result.details.availability.score|default:"0" }}/20</strong></div>
+              <progress class="progress is-small is-info mb-2" value="{{ result.details.availability.score|default:"0" }}" max="20"></progress>
+              <div class="mb-1"><span>Location</span> <strong>{{ result.details.location.score|default:"0" }}/10</strong></div>
+              <progress class="progress is-small is-info mb-2" value="{{ result.details.location.score|default:"0" }}" max="10"></progress>
+              <div class="mb-1"><span>Transportation</span> <strong>{{ result.details.transportation.score|default:"0" }}/5</strong></div>
+              <progress class="progress is-small is-info mb-2" value="{{ result.details.transportation.score|default:"0" }}" max="5"></progress>
+              <div class="mb-1"><span>Language</span> <strong>{{ result.details.language.score|default:"0" }}/5</strong></div>
+              <progress class="progress is-small is-info" value="{{ result.details.language.score|default:"0" }}" max="5"></progress>
+            </td>
+            <td class="is-size-7" style="min-width:250px;">
+              <span class="tag {% if result.ai_source == 'chatgpt' %}is-info{% else %}is-warning{% endif %} is-light mb-2">
+                {% if result.ai_source == "chatgpt" %}Source: ChatGPT-enhanced{% else %}Source: local scoring fallback{% endif %}
+              </span>
+              <p>{{ result.ai_reasoning }}</p>
+            </td>
 
             {# ── Action column ── #}
             <td>
@@ -171,7 +194,7 @@ Optional context (staff only):
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="has-text-grey-light is-italic">No matches found.</td>
+            <td colspan="6" class="has-text-grey-light is-italic">No matches found.</td>
           </tr>
           {% endfor %}
         </tbody>

@@ -106,7 +106,7 @@
 
 {# ── Staff results ── #}
 {% if match_results %}
-  {% include "registry/_registry_match_results.html" with results=match_results role=user_role match_direction=match_direction selected_caregiver=selected_caregiver selected_client=selected_client selected_tag_ids=selected_tag_ids %}
+  {% include result_template with results=match_results role=user_role match_direction=match_direction selected_caregiver=selected_caregiver selected_client=selected_client selected_tag_ids=selected_tag_ids ai_mode=ai_mode %}
 {% elif selected_tag_ids %}
   {# Tags were selected but no person chosen yet (or no results) #}
   {% if match_direction == "find_clients" and not selected_caregiver %}
@@ -168,7 +168,7 @@
 </div>
 
 {% if match_results %}
-  {% include "registry/_registry_match_results.html" with results=match_results role=user_role match_direction=match_direction selected_tag_ids=selected_tag_ids %}
+  {% include result_template with results=match_results role=user_role match_direction=match_direction selected_tag_ids=selected_tag_ids ai_mode=ai_mode %}
 {% elif selected_tag_ids %}
 <div class="notification is-light">
   No matching clients found for the selected criteria.
@@ -218,7 +218,7 @@
 </div>
 
 {% if match_results %}
-  {% include "registry/_registry_match_results.html" with results=match_results role=user_role match_direction=match_direction selected_tag_ids=selected_tag_ids %}
+  {% include result_template with results=match_results role=user_role match_direction=match_direction selected_tag_ids=selected_tag_ids ai_mode=ai_mode %}
 {% elif selected_tag_ids %}
 <div class="notification is-light">
   No matching careworkers found for the selected criteria.

@@ -74,17 +74,34 @@ LAST_NAMES = [
     "Wright", "Scott", "Torres", "Nguyen", "Hill", "Flores",
 ]
 
+# Full 33-key pools (mirrors registry.models.EXPERIENCE_CHOICES /
+# CARE_NEEDS_CHOICES) so seeded caregiver/client overlap is a matter of
+# chance rather than near-guaranteed. Keeping these in sync with the model
+# choice lists avoids importing registry.models at module load time
+# (management commands are imported before Django apps are fully ready).
 EXPERIENCE_OPTIONS = [
-    "domestic_tasks", "cooking", "bathing", "dressing", "errands",
-    "lifting_transfers", "elders", "cognitive_disabilities",
-    "chronic_illness", "lgbtq", "person_centered",
+    "domestic_tasks", "errands", "bathing", "cooking", "dressing",
+    "assistive_technology", "bowel_programs", "couple_family", "catheters",
+    "chair_users", "chronic_illness", "cna", "cognitive_disabilities",
+    "complex_illnesses", "cpr", "deaf_community", "dementia",
+    "developmental_disabilities", "elders", "emergency_preparedness", "emt",
+    "cil_courses", "feeding_tubes", "fragrance_free", "anti_bias",
+    "soft_skills", "hoyer_lifts", "ihss", "lgbtq", "lifting_transfers",
+    "limited_english", "person_centered", "spinal_cord", "ventilators",
+    "visual_impairments",
 ]
 
 CARE_NEEDS_OPTIONS = [
-    "domestic_tasks", "cooking", "bathing", "dressing", "errands",
-    "lifting_transfers", "elders", "cognitive_disabilities",
-    "chronic_illness", "lgbtq", "person_centered",
+    "domestic_tasks", "errands", "bathing", "cooking", "dressing",
+    "assistive_technology", "bowel_programs", "couple_family", "catheters",
+    "chair_users", "chronic_illness", "cognitive_disabilities",
+    "complex_illnesses", "deaf_community", "dementia",
+    "developmental_disabilities", "elders", "emergency_preparedness",
+    "feeding_tubes", "fragrance_free", "hoyer_lifts", "ihss", "lgbtq",
+    "lifting_transfers", "limited_english", "person_centered",
+    "spinal_cord", "ventilators", "visual_impairments",
 ]
+
 
 DAYS_OF_WEEK = [
     "monday", "tuesday", "wednesday", "thursday",
@@ -498,7 +515,8 @@ class Command(BaseCommand):
             },
         )
 
-        experience = random.sample(EXPERIENCE_OPTIONS, k=random.randint(4, 7))
+        experience = random.sample(EXPERIENCE_OPTIONS, k=random.randint(3, 5))
+
 
         profile, _ = CaregiverProfile.objects.get_or_create(
             user_profile=user_profile,
@@ -567,7 +585,8 @@ class Command(BaseCommand):
             },
         )
 
-        care_needs = random.sample(CARE_NEEDS_OPTIONS, k=random.randint(3, 6))
+        care_needs = random.sample(CARE_NEEDS_OPTIONS, k=random.randint(3, 5))
+
 
         profile, _ = ClientProfile.objects.get_or_create(
             user_profile=user_profile,

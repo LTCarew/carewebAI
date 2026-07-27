@@ -26,14 +26,15 @@
       <div class="field mb-4">
         <label class="label">I want to find matches for a…</label>
         <div class="buttons has-addons">
-          <a href="?match_type=find_clients{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
+          <a href="?match_type=find_clients&match_limit={{ match_limit }}{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
              class="button {% if match_direction == 'find_clients' %}is-link is-selected{% else %}is-light{% endif %}">
             Careworker → show matching Clients
           </a>
-          <a href="?match_type=find_caregivers{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
+          <a href="?match_type=find_caregivers&match_limit={{ match_limit }}{% for tid in selected_tag_ids %}&tag_ids={{ tid }}{% endfor %}"
              class="button {% if match_direction == 'find_caregivers' %}is-link is-selected{% else %}is-light{% endif %}">
             Client → show matching Careworkers
           </a>
+
         </div>
       </div>
 
@@ -95,6 +96,20 @@
         </div>
       </div>
 
+      <div class="field mt-4">
+        <label class="label" for="staff-match-limit">Number of matches to show</label>
+        <div class="control">
+          <div class="select">
+            <select id="staff-match-limit" name="match_limit" aria-label="Number of matches to show">
+              <option value="3" {% if match_limit == "3" %}selected{% endif %}>3</option>
+              <option value="5" {% if match_limit == "5" %}selected{% endif %}>5</option>
+              <option value="10" {% if match_limit == "10" %}selected{% endif %}>10</option>
+              <option value="all" {% if match_limit == "all" %}selected{% endif %}>All</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="buttons mt-4">
         <button type="submit" class="button is-primary">Find Matches</button>
         <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
@@ -105,6 +120,7 @@
 </div>
 
 {# ── Staff results ── #}
+
 {% if match_results %}
   {% include result_template with results=match_results role=user_role match_direction=match_direction selected_caregiver=selected_caregiver selected_client=selected_client selected_tag_ids=selected_tag_ids ai_mode=ai_mode %}
 {% elif selected_tag_ids %}
@@ -158,6 +174,20 @@
         </div>
       </div>
 
+      <div class="field mt-4">
+        <label class="label" for="caregiver-match-limit">Number of matches to show</label>
+        <div class="control">
+          <div class="select">
+            <select id="caregiver-match-limit" name="match_limit" aria-label="Number of matches to show">
+              <option value="3" {% if match_limit == "3" %}selected{% endif %}>3</option>
+              <option value="5" {% if match_limit == "5" %}selected{% endif %}>5</option>
+              <option value="10" {% if match_limit == "10" %}selected{% endif %}>10</option>
+              <option value="all" {% if match_limit == "all" %}selected{% endif %}>All</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="buttons mt-4">
         <button type="submit" class="button is-primary">Find Clients</button>
         <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
@@ -173,6 +203,7 @@
 <div class="notification is-light">
   No matching clients found for the selected criteria.
 </div>
+
 {% else %}
 <div class="notification is-light">
   Select at least one care tag above to find clients in your network.
@@ -208,6 +239,20 @@
         </div>
       </div>
 
+      <div class="field mt-4">
+        <label class="label" for="client-match-limit">Number of matches to show</label>
+        <div class="control">
+          <div class="select">
+            <select id="client-match-limit" name="match_limit" aria-label="Number of matches to show">
+              <option value="3" {% if match_limit == "3" %}selected{% endif %}>3</option>
+              <option value="5" {% if match_limit == "5" %}selected{% endif %}>5</option>
+              <option value="10" {% if match_limit == "10" %}selected{% endif %}>10</option>
+              <option value="all" {% if match_limit == "all" %}selected{% endif %}>All</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="buttons mt-4">
         <button type="submit" class="button is-primary">Find Careworkers</button>
         <button type="submit" name="ai" value="1" class="button is-info">✨ AI Match</button>
@@ -223,6 +268,7 @@
 <div class="notification is-light">
   No matching careworkers found for the selected criteria.
 </div>
+
 {% else %}
 <div class="notification is-light">
   Select at least one care need above to find matching careworkers in your network.

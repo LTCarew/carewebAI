@@ -327,6 +327,195 @@ def match_cancel(request, match_id):
 # Stage 8: AI Assisted Match Views
 # ==============================================
 
+# ==============================================
+# Stability Snapshot: Flag for Stabilization Review
+# ==============================================
+
+@login_required
+def flag_stabilization_review(request, match_id):
+    """
+    Staff-only POST action: flag an active match for stabilization review.
+
+    Guards:
+    - User must be admin/staff (via user_is_admin_or_staff).
+    - The match must belong to the user's active organization.
+    - Duplicate active flags are silently ignored (idempotent success message).
+    """
+    from django.utils import timezone as _tz
+    from registry.services import user_is_admin_or_staff, get_active_organization
+
+    if request.method != "POST":
+        return redirect("org_dashboard")
+
+    if not user_is_admin_or_staff(request.user):
+        messages.error(request, "Only staff can flag relationships for stabilization review.")
+        return redirect("dashboard_redirect")
+
+    active_org = get_active_organization(request)
+    match = get_object_or_404(Match, pk=match_id)
+
+    # Org-scope check: the match must belong to the staff member's active org.
+    if match.organization != active_org:
+        messages.error(request, "You do not have permission to flag this relationship.")
+        return redirect("org_dashboard")
+
+    if match.stabilization_review_requested:
+        messages.info(request, "This relationship has already been flagged for stabilization review.")
+    else:
+        try:
+            requester_profile = request.user.profile
+        except Exception:
+            requester_profile = None
+
+        match.stabilization_review_requested = True
+        match.stabilization_review_requested_at = _tz.now()
+        match.stabilization_review_requested_by = requester_profile
+        match.save(update_fields=[
+            "stabilization_review_requested",
+            "stabilization_review_requested_at",
+            "stabilization_review_requested_by",
+            "updated_at",
+        ])
+        messages.success(
+            request,
+            f"Relationship between {match.caregiver.user_profile.display_name} "
+            f"and {match.client.user_profile.display_name} has been flagged for stabilization review.",
+        )
+
+    return redirect("org_dashboard")
+
+
+@login_required
+def unflag_stabilization_review(request, match_id):
+    """
+    Staff-only POST action: clear the stabilization review flag on a match.
+
+    Mirrors flag_stabilization_review; same guard rules apply.
+    """
+    from django.utils import timezone as _tz
+    from registry.services import user_is_admin_or_staff, get_active_organization
+
+    if request.method != "POST":
+        return redirect("match_stability_detail", match_id=match_id)
+
+    if not user_is_admin_or_staff(request.user):
+        messages.error(request, "Only staff can manage stabilization review flags.")
+        return redirect("dashboard_redirect")
+
+    active_org = get_active_organization(request)
+    match = get_object_or_404(Match, pk=match_id)
+
+    if match.organization != active_org:
+        messages.error(request, "You do not have permission to modify this relationship.")
+        return redirect("org_dashboard")
+
+    if not match.stabilization_review_requested:
+        messages.info(request, "This relationship was not flagged.")
+    else:
+        match.stabilization_review_requested = False
+        match.stabilization_review_requested_at = None
+        match.stabilization_review_requested_by = None
+        match.save(update_fields=[
+            "stabilization_review_requested",
+            "stabilization_review_requested_at",
+            "stabilization_review_requested_by",
+            "updated_at",
+        ])
+        messages.success(
+            request,
+            f"Stabilization review flag removed for {match.caregiver.user_profile.display_name} "
+            f"and {match.client.user_profile.display_name}.",
+        )
+
+    return redirect("match_stability_detail", match_id=match_id)
+
+
+@login_required
+def stability_detail(request, match_id):
+    """
+    Staff-only page: full Stability Snapshot for a single active match.
+
+    Shows:
+    - Overall stability status / score / explanation
+    - 5 stability signals (schedule_consistency, travel_burden, etc.)
+    - Per-entry rating history: for each schedule slot (e.g. Monday 8 AM–12 PM)
+      a table of every past session date with client & caregiver scores and notes.
+    - Flag / Unflag for Stabilization Review actions.
+    """
+    from registry.services import user_is_admin_or_staff, get_active_organization
+    from .stability import get_stability_snapshot
+    from registry.models import ScheduleEntry, ScheduleEntryRating
+
+    if not user_is_admin_or_staff(request.user):
+        messages.error(request, "Only staff can view stability detail pages.")
+        return redirect("dashboard_redirect")
+
+    active_org = get_active_organization(request)
+    match = get_object_or_404(
+        Match.objects.select_related(
+            "caregiver__user_profile",
+            "client__user_profile",
+            "organization",
+        ),
+        pk=match_id,
+    )
+
+    if match.organization != active_org:
+        messages.error(request, "You do not have permission to view this relationship.")
+        return redirect("org_dashboard")
+
+    snapshot = get_stability_snapshot(match)
+
+    # ── Build per-entry rating history ────────────────────────────────────────
+    # Find the approved schedule linked to this match (newest if multiple)
+    from registry.models import Schedule
+    schedule = (
+        Schedule.objects.filter(match=match, status="approved")
+        .order_by("-created_at")
+        .first()
+    )
+
+    entry_histories = []
+    if schedule:
+        entries = (
+            ScheduleEntry.objects.filter(schedule=schedule)
+            .order_by("day_of_week", "start_time")
+        )
+        for entry in entries:
+            ratings = (
+                ScheduleEntryRating.objects.filter(schedule_entry=entry)
+                .select_related("rater_profile")
+                .order_by("-rating_date", "rater_role")
+            )
+            # Group by rating_date: date → {client: rating_obj, caregiver: rating_obj}
+            from collections import defaultdict
+            by_date = defaultdict(dict)
+            for r in ratings:
+                by_date[r.rating_date][r.rater_role] = r
+
+            # Build sorted list newest-first
+            sessions = []
+            for session_date in sorted(by_date.keys(), reverse=True):
+                raters = by_date[session_date]
+                sessions.append({
+                    "date": session_date,
+                    "client": raters.get("client"),
+                    "caregiver": raters.get("caregiver"),
+                })
+
+            entry_histories.append({
+                "entry": entry,
+                "sessions": sessions,
+            })
+
+    return render(request, "matching/stability_detail.html", {
+        "match": match,
+        "snapshot": snapshot,
+        "entry_histories": entry_histories,
+        "schedule": schedule,
+    })
+
+
 @login_required
 def ai_match_for_caregiver(request):
     """Redirect to Network Registry where AI matching now lives."""

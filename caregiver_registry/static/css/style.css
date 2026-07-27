@@ -739,3 +739,520 @@ ul.errorlist li,
         font-size: 1.15rem;
     }
 }
+
+
+/* ════════════════════════════════════════════════════
+   STABILITY SNAPSHOT — Status indicators and panel
+   Level 3 POC — Caregiver–client relationship monitoring
+   ════════════════════════════════════════════════════ */
+
+/*
+   Color tokens for stability statuses.
+   We never rely on color alone — each status also has a visible text label.
+   WCAG AA contrast is preserved in both light and dark themes.
+*/
+:root {
+    --stability-green:   #16a34a;   /* same green as Bulma is-success solid */
+    --stability-yellow:  #a16207;   /* amber — darker than #f2e94e for contrast */
+    --stability-red:     var(--app-danger);  /* #da3e52 — reuses existing token */
+    --stability-neutral: #64748b;   /* slate-500 — used for "Not Yet Rated" */
+
+    --stability-green-bg:  #f0fdf4;
+    --stability-yellow-bg: #fefce8;
+    --stability-red-bg:    #fff1f2;
+    --stability-none-bg:   #f1f5f9;
+
+    --stability-green-border:  #86efac;
+    --stability-yellow-border: #fde047;
+    --stability-red-border:    #fda4af;
+    --stability-none-border:   #cbd5e1;
+
+    --stability-panel-bg:    var(--app-surface);
+    --stability-panel-border: var(--app-border);
+}
+
+/* ── Status badge (dot + label) ──────────────────────────────────────────── */
+
+.stability-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    /* visible focus for keyboard users */
+    border-radius: 4px;
+}
+
+.stability-status:focus-visible {
+    outline: 3px solid var(--app-focus);
+    outline-offset: 2px;
+}
+
+.stability-status__dot {
+    display: inline-block;
+    width: 0.65em;
+    height: 0.65em;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Green / Stable */
+.stability-status--green {
+    color: var(--stability-green);
+}
+.stability-status--green .stability-status__dot {
+    background-color: var(--stability-green);
+}
+
+/* Yellow / Monitor */
+.stability-status--yellow {
+    color: var(--stability-yellow);
+}
+.stability-status--yellow .stability-status__dot {
+    background-color: #ca8a04;  /* slightly darker dot for visibility */
+}
+
+/* Red / At Risk */
+.stability-status--red {
+    color: var(--stability-red);
+}
+.stability-status--red .stability-status__dot {
+    background-color: var(--stability-red);
+}
+
+/* None / Not Yet Rated */
+.stability-status--none {
+    color: var(--stability-neutral);
+}
+.stability-status--none .stability-status__dot {
+    background-color: var(--stability-neutral);
+}
+
+/* Inline variant used inside the panel heading */
+.stability-status--inline {
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-left: 0.5em;
+    vertical-align: middle;
+}
+
+/* ── Table cell ──────────────────────────────────────────────────────────── */
+
+.stability-cell {
+    min-width: 8rem;
+    vertical-align: middle;
+}
+
+/* Flex wrapper so status link + flag badge sit side-by-side */
+.stability-cell__inner {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+}
+
+/* The status link in the table — behaves like the old badge but is clickable */
+.stability-cell__inner .stability-status {
+    text-decoration: none;
+}
+.stability-cell__inner .stability-status:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Persistent flag badge shown whenever a match is flagged for review */
+.stability-flag-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    line-height: 1;
+    background-color: #fef9c3;
+    border: 1px solid #fde047;
+    border-radius: 4px;
+    padding: 0.15rem 0.35rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Screen-reader-only utility (mirrors Bulma's .is-sr-only) */
+.is-sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Subtle left-border accent on the table row — does NOT fill the whole row */
+tr:has(.stability-status--red) {
+    border-left: 3px solid var(--stability-red);
+}
+tr:has(.stability-status--yellow) {
+    border-left: 3px solid #eab308;
+}
+tr:has(.stability-status--green) {
+    border-left: 3px solid var(--stability-green);
+}
+tr:has(.stability-status--none) {
+    border-left: 3px solid var(--stability-none-border);
+}
+
+/* ── <details> disclosure wrapper ────────────────────────────────────────── */
+
+.stability-details {
+    position: relative;
+}
+
+.stability-details > summary {
+    list-style: none;    /* hide default triangle in most browsers */
+}
+.stability-details > summary::-webkit-details-marker {
+    display: none;       /* hide triangle in Safari */
+}
+
+/* ── Expanded panel ──────────────────────────────────────────────────────── */
+
+.stability-panel {
+    position: absolute;
+    z-index: 100;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    min-width: 22rem;
+    max-width: 28rem;
+    background: var(--stability-panel-bg);
+    border: 1px solid var(--stability-panel-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 1rem 1.25rem;
+}
+
+.stability-panel__heading {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25em;
+}
+
+.stability-panel__score {
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+    color: var(--app-text-soft);
+}
+
+/* Signal table */
+.stability-signals {
+    margin: 0 0 0.75rem;
+    font-size: 0.82rem;
+}
+.stability-signals__row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+    border-bottom: 1px solid var(--app-border);
+}
+.stability-signals__row:last-child {
+    border-bottom: none;
+}
+.stability-signals dt {
+    font-weight: 600;
+    color: var(--app-text-soft);
+    margin: 0;
+}
+.stability-signals dd {
+    margin: 0;
+    text-align: right;
+}
+
+.stability-panel__explanation {
+    font-size: 0.82rem;
+    color: var(--app-text-soft);
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+
+.stability-panel__action {
+    margin-top: 0.5rem;
+}
+
+.stability-panel__review-pending {
+    font-size: 0.85rem;
+    color: var(--stability-green);
+    font-weight: 600;
+    margin: 0;
+}
+
+.stability-panel__flag-btn {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ── Responsive: on small screens, anchor the panel to the left of viewport ─ */
+
+@media screen and (max-width: 768px) {
+    .stability-panel {
+        position: fixed;
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 12px 12px 0 0;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.15);
+    }
+}
+
+/* ── Stability Detail page specifics ────────────────────────────────────── */
+
+/* Larger status badge in the detail page header */
+.stability-status--large {
+    font-size: 1.1rem;
+    font-weight: 700;
+    gap: 0.4em;
+}
+.stability-status--large .stability-status__dot {
+    width: 0.75em;
+    height: 0.75em;
+}
+
+/* Flag block on the detail page */
+.stability-flag-block .notification {
+    margin-bottom: 0;
+}
+
+/* Notes cell in the session history table — allow wrapping */
+.stability-notes-cell {
+    max-width: 16rem;
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Score badges in the detail table */
+.score-badge {
+    font-weight: 700;
+    min-width: 3.2rem;
+    justify-content: center;
+}
+
+/*
+END STABILITY SNAPSHOT
+   ════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
+   INFO TIPS — plain-language tooltip icons
+   Used on stability signal labels and rating metric column headers
+   so staff reviewers always know what each term means.
+   ════════════════════════════════════════════════════ */
+
+.info-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 0.3em;
+}
+
+/* The small circular "i" button */
+.info-tip__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    border: 1.5px solid var(--app-primary);
+    background: transparent;
+    color: var(--app-primary);
+    font-size: 0.75em;
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 120ms ease, color 120ms ease;
+    /* reset browser button defaults */
+    -webkit-appearance: none;
+    appearance: none;
+    font-family: Georgia, serif;  /* italic "i" looks better in serif */
+}
+
+.info-tip__btn:hover,
+.info-tip__btn:focus-visible {
+    background-color: var(--app-primary);
+    color: #fff;
+    outline: none;
+}
+
+.info-tip__btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(126, 107, 143, 0.35);
+}
+
+/* The tooltip bubble */
+.info-tip__body {
+    display: none;
+    position: absolute;
+    z-index: 300;
+    bottom: calc(100% + 0.6rem);
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 17rem;
+    max-width: 24rem;
+    background: #1e293b;
+    color: #f8fafc;
+    font-size: 0.78rem;
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1.55;
+    padding: 0.65rem 0.9rem;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+    pointer-events: none;
+    white-space: normal;
+    text-align: left;
+}
+
+/* Down-pointing arrow */
+.info-tip__body::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #1e293b;
+}
+
+/* Show on hover (CSS, desktop) or focus-within (keyboard) or .is-open (JS tap toggle) */
+.info-tip:hover .info-tip__body,
+.info-tip:focus-within .info-tip__body,
+.info-tip.is-open .info-tip__body {
+    display: block;
+}
+
+/* On narrow screens flip the bubble below the icon instead of above */
+@media screen and (max-width: 768px) {
+    .info-tip__body {
+        bottom: auto;
+        top: calc(100% + 0.5rem);
+        min-width: 13rem;
+        max-width: 88vw;
+        /* shift left if near the right edge */
+        left: 0;
+        transform: none;
+    }
+    .info-tip__body::after {
+        top: auto;
+        bottom: 100%;
+        left: 1rem;
+        transform: none;
+        border-top-color: transparent;
+        border-bottom-color: #1e293b;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   END INFO TIPS
+   ════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════
+   GLOSSARY PANEL — <details>/<summary> disclosure block
+   on the Stability Detail page
+   ════════════════════════════════════════════════════ */
+
+.glossary-panel {
+    border: 1px solid var(--app-border);
+    border-radius: 10px;
+    background: #f8fafc;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.glossary-panel summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.75rem 1.1rem;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--app-primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    user-select: none;
+}
+
+.glossary-panel summary::-webkit-details-marker {
+    display: none;
+}
+
+.glossary-panel summary::before {
+    content: "▶";
+    font-size: 0.65em;
+    transition: transform 150ms ease;
+    display: inline-block;
+}
+
+.glossary-panel[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.glossary-panel summary:focus-visible {
+    outline: 3px solid var(--app-focus);
+    outline-offset: -2px;
+}
+
+.glossary-panel__body {
+    padding: 0.25rem 1.1rem 1rem;
+    border-top: 1px solid var(--app-border);
+}
+
+.glossary-panel__body dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 1rem;
+    margin: 0;
+    font-size: 0.84rem;
+}
+
+.glossary-panel__body dt {
+    font-weight: 700;
+    color: var(--app-text);
+    white-space: nowrap;
+    padding-top: 0.1rem;
+}
+
+.glossary-panel__body dd {
+    margin: 0;
+    color: var(--app-text-soft);
+    line-height: 1.5;
+}
+
+.glossary-panel__section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    grid-column: 1 / -1;
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
+    border-top: 1px dashed var(--app-border);
+}
+
+.glossary-panel__section-label:first-child {
+    margin-top: 0;
+    border-top: none;
+}
+
+/* ═══════════════════════════════════════════════════════
+   END GLOSSARY PANEL
+   ════════════════════════════════════════════════════ */

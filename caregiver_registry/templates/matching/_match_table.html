@@ -11,6 +11,8 @@ Required context:
 Optional context:
   action_approve_label — defaults to "Approve"
   action_decline_label — defaults to "Decline"
+  show_stability       — True/False whether to show the Stability Snapshot column
+                         (only meaningful for viewer_role == 'staff', active matches)
 
 Behaviour:
   - When viewer_role == 'caregiver' the "Careworker" column is hidden because
@@ -32,6 +34,20 @@ Behaviour:
         <th scope="col">Tags</th>
         <th scope="col">Client Status</th>
         <th scope="col">Careworker Status</th>
+        {% if show_stability %}
+        <th scope="col">
+          Stability
+          <span class="info-tip">
+            <button class="info-tip__btn" type="button" aria-expanded="false"
+                    aria-label="What is Stability?">i</button>
+            <span class="info-tip__body" role="tooltip">
+              A relationship health snapshot based on session ratings submitted
+              by both the client and careworker after each scheduled appointment.
+              Click the status label to view the full breakdown.
+            </span>
+          </span>
+        </th>
+        {% endif %}
         {% if show_actions %}<th scope="col">Actions</th>{% endif %}
       </tr>
     </thead>
@@ -86,6 +102,34 @@ Behaviour:
             <span class="tag is-warning is-light">Pending</span>
           {% endif %}
         </td>
+
+        {# ── Stability Snapshot column ───────────────────────────────────── #}
+        {% if show_stability %}
+        <td class="stability-cell">
+          {% if match.stability_snapshot %}
+            {% with snap=match.stability_snapshot %}
+            <div class="stability-cell__inner">
+              {# Status badge links to the full detail page #}
+              <a href="{% url 'match_stability_detail' match.pk %}"
+                 class="stability-status stability-status--{{ snap.status }}"
+                 aria-label="View stability details for {{ match.caregiver.user_profile.display_name }} and {{ match.client.user_profile.display_name }}">
+                <span class="stability-status__dot" aria-hidden="true"></span>
+                <span>{{ snap.label }}</span>
+              </a>
+              {# Persistent flag badge — always visible when flagged #}
+              {% if snap.review_requested %}
+                <span class="stability-flag-badge" title="Flagged for Stabilization Review">
+                  🚩 <span class="is-sr-only">Flagged for review</span>
+                </span>
+              {% endif %}
+            </div>
+            {% endwith %}
+          {% else %}
+            <span class="has-text-grey-light is-size-7">—</span>
+          {% endif %}
+        </td>
+        {% endif %}{# end show_stability #}
+
         {% if show_actions %}
         <td>
           <div class="buttons are-small">

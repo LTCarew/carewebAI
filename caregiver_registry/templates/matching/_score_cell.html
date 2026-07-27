@@ -1,0 +1,14 @@
+{% comment %}
+Reusable score cell: renders a 1–10 score with color-coding.
+  score ≥ 8  → green
+  score ≥ 5  → yellow
+  score < 5  → red
+Usage: {% include "matching/_score_cell.html" with score=r.care_fit_respect %}
+{% endcomment %}
+{% if score is not None %}
+  <span class="tag score-badge {% if score >= 8 %}is-success is-light{% elif score >= 5 %}is-warning is-light{% else %}is-danger is-light{% endif %}">
+    {{ score }}/10
+  </span>
+{% else %}
+  <span class="has-text-grey-light is-size-7">—</span>
+{% endif %}

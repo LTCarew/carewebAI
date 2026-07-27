@@ -70,7 +70,7 @@
 <div class="card app-card mb-4">
   <div class="card-content">
     <h2 class="title is-5">✅ Active Matches</h2>
-    {% with matches=active_matches viewer_role="staff" show_actions=False page_param="p_act" empty_message="No active matches." %}
+    {% with matches=active_matches viewer_role="staff" show_actions=False page_param="p_act" empty_message="No active matches." show_stability=True %}
       {% include "matching/_match_table.html" %}
     {% endwith %}
   </div>

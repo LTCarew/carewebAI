@@ -244,6 +244,25 @@ class Match(models.Model):
         help_text="Optional staff notes about this match"
     )
 
+    # ── Stabilization Review Tracking ─────────────────────────────────────────
+    stabilization_review_requested = models.BooleanField(
+        default=False,
+        help_text="True when an authorized staff member has flagged this relationship for stabilization review.",
+    )
+    stabilization_review_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when the stabilization review was first requested.",
+    )
+    stabilization_review_requested_by = models.ForeignKey(
+        "accounts.UserProfile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="requested_stabilization_reviews",
+        help_text="The staff member who requested the stabilization review.",
+    )
+
     # ── Timestamps ────────────────────────────────────────────────────────────
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

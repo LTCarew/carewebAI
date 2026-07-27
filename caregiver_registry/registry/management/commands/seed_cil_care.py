@@ -3,19 +3,38 @@ Django management command to seed a complete CIL-Care demo environment.
 
 Creates:
   - The CIL-Care organisation with a ready-to-use admin account.
-  - N matched caregiver/client pairs (default 10), all approved members of
-    CIL-Care, with active Matches, fully-approved Schedules + ScheduleEntries,
-    and past ScheduleEntryRatings from both parties.
+  - N matched caregiver/client pairs (default 9, one per rating scenario),
+    all approved members of CIL-Care, with active Matches, fully-approved
+    Schedules + ScheduleEntries, and contrasting past ScheduleEntryRatings
+    that exercise every Stability Snapshot status and signal combination.
+
+Rating scenarios (cycling when --count > 9):
+  1 — Green  / Stable         : flat 9s — baseline high / all signals positive
+  2 — Yellow / Monitor        : flat 6s — baseline mid
+  3 — Red    / At Risk        : flat 3s — baseline low
+  4 — Declining trend         : starts 9 (oldest) → drops to 3 (newest)
+  5 — Improving trend         : starts 3 (oldest) → rises to 9 (newest)
+  6 — Volatile / inconsistent : alternates 9, 3, 9, 3, 9 week to week
+  7 — Split perspective       : client rates ~9, caregiver rates ~3
+  8 — Single-metric failure   : workload low (2–3), all others high (8–9)
+  9 — No ratings yet          : schedule exists but zero ratings → "Not Yet Rated" badge
+
+ZIP / travel-burden variation:
+  Pairs 1–3 share org ZIP (94612) → travel_burden = Low
+  Pair 4 uses client ZIP 94702 (Berkeley ~5 mi)  → travel_burden = Low/Moderate
+  Pair 5 uses client ZIP 95112 (San Jose ~40 mi) → travel_burden = High
+  Pair 6 uses client ZIP 94010 (Burlingame ~35 mi) → travel_burden = High
+  Pairs 7–9 share org ZIP → travel_burden = Low
 
 Usage:
     python manage.py seed_cil_care
-    python manage.py seed_cil_care --count 5
+    python manage.py seed_cil_care --count 9
     python manage.py seed_cil_care --clear
 
 Credentials:
-    Org admin  : cil-projects@thecil.org / carewebai2026
-    Caregivers : cilcg1@example.com … cilcgN@example.com / carewebai2026
-    Clients    : cilcl1@example.com … cilclN@example.com / carewebai2026
+    Org admin  : cil-projects@thecil.org / cil-projects@thecil.org
+    Caregivers : cilcg1@example.com … cilcgN@example.com / cil-projects@thecil.org
+    Clients    : cilcl1@example.com … cilclN@example.com / cil-projects@thecil.org
 """
 
 import random
@@ -29,7 +48,7 @@ User = get_user_model()
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-SEED_PASSWORD = "carewebai2026"
+SEED_PASSWORD = "cil-projects@thecil.org"
 ORG_NAME      = "CIL-Care"
 ORG_EMAIL     = "cil-projects@thecil.org"
 ORG_CITY      = "Oakland"
@@ -96,6 +115,93 @@ _DAY_TO_INT = {
     "friday": 4, "saturday": 5, "sunday": 6,
 }
 
+# ── Rating Scenarios ─────────────────────────────────────────────────────────
+#
+# Each scenario is a dict:
+#   name        : display label
+#   type        : 'flat' | 'trend' | 'volatile' | 'split' | 'single_metric' | 'none'
+#   stability   : expected Stability Snapshot status for the console summary
+#
+# Additional keys vary by type (see _create_ratings for interpretation).
+
+RATING_SCENARIOS = [
+    # 1 — Green baseline
+    {
+        "name": "Green / Stable",
+        "type": "flat",
+        "stability": "green",
+        "lo": 9, "hi": 9,
+        "client_zip": ORG_ZIP,
+    },
+    # 2 — Yellow baseline
+    {
+        "name": "Yellow / Monitor",
+        "type": "flat",
+        "stability": "yellow",
+        "lo": 6, "hi": 6,
+        "client_zip": ORG_ZIP,
+    },
+    # 3 — Red baseline
+    {
+        "name": "Red / At Risk",
+        "type": "flat",
+        "stability": "red",
+        "lo": 3, "hi": 3,
+        "client_zip": ORG_ZIP,
+    },
+    # 4 — Declining trend (starts well → deteriorates)
+    {
+        "name": "Declining trend",
+        "type": "trend",
+        "stability": "yellow→red",
+        "start": 9, "end": 3,   # oldest week = start, most recent week = end
+        "client_zip": "94702",  # Berkeley ~5 mi → travel_burden = Low/Moderate
+    },
+    # 5 — Improving trend (rocky start → recovering)
+    {
+        "name": "Improving trend",
+        "type": "trend",
+        "stability": "red→green",
+        "start": 3, "end": 9,
+        "client_zip": "95112",  # San Jose ~40 mi → travel_burden = High
+    },
+    # 6 — Volatile / erratic week-to-week
+    {
+        "name": "Volatile / inconsistent",
+        "type": "volatile",
+        "stability": "yellow",
+        "pattern": [9, 3, 9, 3, 9],   # values per week oldest→newest
+        "client_zip": "94010",  # Burlingame ~35 mi → travel_burden = High
+    },
+    # 7 — Split perspective (client praises, caregiver struggles)
+    {
+        "name": "Split perspective (client high, caregiver low)",
+        "type": "split",
+        "stability": "yellow",
+        "client_lo": 8, "client_hi": 9,
+        "caregiver_lo": 2, "caregiver_hi": 4,
+        "client_zip": ORG_ZIP,
+    },
+    # 8 — Single-metric failure (workload overload; all other metrics fine)
+    {
+        "name": "Single-metric failure (workload)",
+        "type": "single_metric",
+        "stability": "yellow→red",
+        # workload_support_balance intentionally low; others stay high
+        "default_lo": 8, "default_hi": 9,
+        "override_metric": "workload_support_balance",
+        "override_lo": 2, "override_hi": 3,
+        "client_zip": ORG_ZIP,
+    },
+    # 9 — No ratings at all → "Not Yet Rated" (stability is never inferred from match_score)
+    {
+        "name": "No ratings yet (Not Yet Rated)",
+        "type": "none",
+        "stability": "none (Not Yet Rated)",
+        "client_zip": ORG_ZIP,
+    },
+]
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -112,29 +218,69 @@ def _past_occurrences(day_name: str, weeks_back: int = 5) -> list:
     """
     Return the dates of the most recent `weeks_back` weekly occurrences of
     `day_name` that are strictly in the past (relative to today).
+    Returns them oldest-first (index 0 = oldest, index -1 = most recent).
     """
     today = date.today()
     target_dow = _DAY_TO_INT[day_name]
-    # Find the most recent past occurrence
     days_since = (today.weekday() - target_dow) % 7 or 7
     most_recent = today - timedelta(days=days_since)
-    return [most_recent - timedelta(weeks=i) for i in range(weeks_back)]
+    # reversed so index 0 = oldest
+    return list(reversed([most_recent - timedelta(weeks=i) for i in range(weeks_back)]))
+
+
+# Notes pools keyed by approximate rating quality
+_NOTES_POSITIVE = [
+    "",
+    "Great session overall.",
+    "Communication was excellent this visit.",
+    "Very professional and attentive.",
+    "Looking forward to continuing this relationship.",
+]
+
+_NOTES_NEUTRAL = [
+    "",
+    "Some scheduling adjustments needed.",
+    "Minor timing issues but resolved quickly.",
+    "Session was okay, a few things to follow up on.",
+    "Things are progressing, could use a check-in.",
+]
+
+_NOTES_NEGATIVE = [
+    "Significant concerns this session.",
+    "Scheduling has been very difficult.",
+    "Communication breakdown — needs immediate attention.",
+    "Workload expectations are not being met.",
+    "Requested a staff check-in.",
+]
+
+
+def _notes_for_score(avg_score):
+    if avg_score >= 7:
+        return random.choice(_NOTES_POSITIVE)
+    elif avg_score >= 5:
+        return random.choice(_NOTES_NEUTRAL)
+    else:
+        return random.choice(_NOTES_NEGATIVE)
 
 
 # ── Main Command ──────────────────────────────────────────────────────────────
 
 class Command(BaseCommand):
     help = (
-        "Seeds the CIL-Care demo organisation with matched caregiver/client pairs, "
-        "approved schedules, and past ratings."
+        "Seeds the CIL-Care demo organisation with matched caregiver/client pairs "
+        "using 9 contrasting rating scenarios that exercise every Stability Snapshot "
+        "status and signal combination."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--count",
             type=int,
-            default=10,
-            help="Number of caregiver/client matched pairs to create (default 10).",
+            default=9,
+            help=(
+                "Number of caregiver/client matched pairs to create (default 9 — "
+                "one per rating scenario). Values > 9 cycle back through the scenarios."
+            ),
         )
         parser.add_argument(
             "--clear",
@@ -161,24 +307,34 @@ class Command(BaseCommand):
         if do_clear:
             self._clear_seeded_data(org)
 
-        # 2. Matched pairs
+        # 2. Matched pairs — cycle through RATING_SCENARIOS
         created_pairs = []
         for i in range(1, count + 1):
-            cg_profile, cl_profile = self._create_matched_pair(i, org, admin_user_profile)
+            scenario = RATING_SCENARIOS[(i - 1) % len(RATING_SCENARIOS)]
+            cg_profile, cl_profile = self._create_matched_pair(
+                i, org, admin_user_profile, scenario=scenario
+            )
             created_pairs.append((cg_profile, cl_profile))
-            self.stdout.write(f"  Pair {i:>2}: {cg_profile.user_profile.display_name}"
-                              f" ↔ {cl_profile.user_profile.display_name}")
+            self.stdout.write(
+                f"  Pair {i:>2}: {cg_profile.user_profile.display_name}"
+                f" ↔ {cl_profile.user_profile.display_name}"
+                f"  [{scenario['name']}]"
+            )
 
         self.stdout.write(self.style.SUCCESS(
             f"\n✓ Done!  Created {len(created_pairs)} matched pairs in '{ORG_NAME}'."
             f"\n\n  Org admin : {ORG_EMAIL} / {SEED_PASSWORD}"
             f"\n  Caregivers: cilcg1@example.com … cilcg{count}@example.com / {SEED_PASSWORD}"
             f"\n  Clients   : cilcl1@example.com … cilcl{count}@example.com / {SEED_PASSWORD}"
-            f"\n\n  All pairs have:"
-            f"\n    • Active matches (both parties approved)"
-            f"\n    • Approved weekly schedules with 2–3 time slots"
-            f"\n    • Past ratings (5 weeks of history) from both client & caregiver\n"
+            f"\n\n  Rating scenarios applied (cycling):"
         ))
+        for idx, sc in enumerate(RATING_SCENARIOS, 1):
+            self.stdout.write(
+                f"    {idx}. {sc['name']}"
+                f"  [ZIP: {sc['client_zip']}]"
+                f"  → expected stability: {sc['stability']}"
+            )
+        self.stdout.write("")
 
     # ── Organisation ─────────────────────────────────────────────────────────
 
@@ -251,19 +407,14 @@ class Command(BaseCommand):
         )
         from matching.models import Match
 
-        # Ratings and schedules cascade from entries/schedules, but let's be explicit.
-        # Matches in this org
         match_count, _ = Match.objects.filter(organization=org).delete()
 
-        # Schedule ratings for this org's schedules
         rating_count, _ = ScheduleEntryRating.objects.filter(
             schedule_entry__schedule__organization=org
         ).delete()
 
-        # Schedules / entries cascade
         sched_count, _ = Schedule.objects.filter(organization=org).delete()
 
-        # Caregiver/client relationships
         cg_rels = OrganizationCaregiver.objects.filter(organization=org)
         cg_profiles = list(cg_rels.values_list("caregiver_profile_id", flat=True))
         cl_rels = OrganizationClient.objects.filter(organization=org)
@@ -272,11 +423,10 @@ class Command(BaseCommand):
         cg_rels.delete()
         cl_rels.delete()
 
-        # Delete caregiver/client profiles + users for the seeded email pattern only
         for cg in CaregiverProfile.objects.filter(pk__in=cg_profiles):
             user = cg.user_profile.user
             if "cilcg" in user.email:
-                user.delete()  # cascades to UserProfile → CaregiverProfile
+                user.delete()
 
         for cl in ClientProfile.objects.filter(pk__in=cl_profiles):
             user = cl.user_profile.user
@@ -290,20 +440,27 @@ class Command(BaseCommand):
 
     # ── Pair creation ─────────────────────────────────────────────────────────
 
-    def _create_matched_pair(self, index, org, admin_profile):
+    def _create_matched_pair(self, index, org, admin_profile, scenario):
         """
         Create one caregiver + one client, approved in org, with an active
-        Match, an approved Schedule, and past ScheduleEntryRatings.
+        Match, an approved Schedule, and past ScheduleEntryRatings per scenario.
+
+        The client ZIP is taken from scenario["client_zip"] so travel_burden
+        varies across scenario types.
         """
+        client_zip = scenario.get("client_zip", ORG_ZIP)
         cg_profile = self._create_caregiver(index)
-        cl_profile  = self._create_client(index)
+        cl_profile  = self._create_client(index, client_zip=client_zip)
 
         self._link_caregiver_to_org(cg_profile, org, admin_profile)
         self._link_client_to_org(cl_profile, org, admin_profile)
 
         match = self._create_active_match(cg_profile, cl_profile, org, admin_profile)
         schedule = self._create_approved_schedule(cg_profile, cl_profile, org, match, admin_profile)
-        self._create_ratings(schedule, cg_profile, cl_profile)
+
+        # Scenario 9 ("none") intentionally skips rating creation
+        if scenario["type"] != "none":
+            self._create_ratings(schedule, cg_profile, cl_profile, scenario=scenario)
 
         return cg_profile, cl_profile
 
@@ -341,7 +498,6 @@ class Command(BaseCommand):
             },
         )
 
-        # Ensure meaningful skill overlap with the paired client
         experience = random.sample(EXPERIENCE_OPTIONS, k=random.randint(4, 7))
 
         profile, _ = CaregiverProfile.objects.get_or_create(
@@ -377,13 +533,14 @@ class Command(BaseCommand):
 
     # ── Client ───────────────────────────────────────────────────────────────
 
-    def _create_client(self, index):
+    def _create_client(self, index, client_zip=None):
         from accounts.models import UserProfile
         from registry.models import ClientProfile
 
         email = f"cilcl{index}@example.com"
         first = random.choice(FIRST_NAMES)
         last  = random.choice(LAST_NAMES)
+        zip_code = client_zip or ORG_ZIP
 
         user, created = User.objects.get_or_create(
             email=email,
@@ -406,17 +563,16 @@ class Command(BaseCommand):
                 "contact_preferences": random.sample(
                     ["phone", "email", "text"], k=random.randint(1, 2)
                 ),
-                "address": f"{random.randint(100, 9999)} Oak St, Oakland, CA {ORG_ZIP}",
+                "address": f"{random.randint(100, 9999)} Oak St, Oakland, CA {zip_code}",
             },
         )
 
-        # Overlap with caregivers experience pool
         care_needs = random.sample(CARE_NEEDS_OPTIONS, k=random.randint(3, 6))
 
         profile, _ = ClientProfile.objects.get_or_create(
             user_profile=user_profile,
             defaults={
-                "base_zip_code": ORG_ZIP,
+                "base_zip_code": zip_code,
                 "attendant_care_programs": random.sample(
                     ["ihss", "wpcs", "out_of_pocket"], k=random.randint(1, 2)
                 ),
@@ -476,14 +632,12 @@ class Command(BaseCommand):
         from matching.models import Match
         from matching.services import compute_match_score
 
-        # Check for existing match first
         existing = Match.objects.filter(
             organization=org, caregiver=cg_profile, client=cl_profile
         ).first()
         if existing:
             return existing
 
-        # Compute a real local score for realism
         score_result = compute_match_score(cg_profile, cl_profile)
 
         match = Match.objects.create(
@@ -508,10 +662,8 @@ class Command(BaseCommand):
     def _create_approved_schedule(self, cg_profile, cl_profile, org, match, admin_profile):
         from registry.models import Schedule, ScheduleEntry
 
-        # Start date is ~6 weeks ago so ratings can cover 5 past weeks
         start_date = date.today() - timedelta(weeks=6)
 
-        # Check for existing approved schedule for this match
         existing = Schedule.objects.filter(
             organization=org,
             caregiver=cg_profile,
@@ -535,7 +687,6 @@ class Command(BaseCommand):
             submitted_at=timezone.now() - timedelta(weeks=6),
         )
 
-        # Pick 2–3 unique time slots
         chosen_slots = random.sample(SLOT_OPTIONS, k=random.randint(2, 3))
         for day, start_t, end_t in chosen_slots:
             ScheduleEntry.objects.get_or_create(
@@ -555,36 +706,100 @@ class Command(BaseCommand):
 
     # ── Ratings ───────────────────────────────────────────────────────────────
 
-    def _create_ratings(self, schedule, cg_profile, cl_profile):
+    def _create_ratings(self, schedule, cg_profile, cl_profile, scenario):
+        """
+        Create ScheduleEntryRating rows for all entries in `schedule` using
+        the given scenario definition.
+
+        Scenario types:
+          flat          — all metrics clamped to randint(lo, hi) for all raters/weeks
+          trend         — score interpolates linearly from `start` to `end` over 5 weeks
+                          (oldest week = start value, most recent week = end value)
+          volatile      — per-week values follow `pattern` list (oldest→newest);
+                          all metrics = pattern[week_idx]
+          split         — client uses (client_lo, client_hi); caregiver uses (caregiver_lo, caregiver_hi)
+          single_metric — all metrics use (default_lo, default_hi) except `override_metric`
+                          which uses (override_lo, override_hi)
+        """
         from registry.models import ScheduleEntry, ScheduleEntryRating
 
         client_up    = cl_profile.user_profile
         caregiver_up = cg_profile.user_profile
+        stype        = scenario["type"]
 
         for entry in ScheduleEntry.objects.filter(schedule=schedule):
+            # oldest-first list of past occurrence dates
             occurrences = _past_occurrences(entry.day_of_week, weeks_back=5)
 
-            for occurrence_date in occurrences:
+            for week_idx, occurrence_date in enumerate(occurrences):
+                # ── compute per-week base value ─────────────────────────────
+                if stype == "flat":
+                    week_value = (scenario["lo"], scenario["hi"])
+
+                elif stype == "trend":
+                    # linear interpolation from start → end over 5 steps
+                    start_v = scenario["start"]
+                    end_v   = scenario["end"]
+                    steps   = max(len(occurrences) - 1, 1)
+                    v = round(start_v + (end_v - start_v) * week_idx / steps)
+                    v = max(1, min(10, v))
+                    week_value = (v, v)
+
+                elif stype == "volatile":
+                    pattern = scenario["pattern"]
+                    v = pattern[week_idx % len(pattern)]
+                    week_value = (v, v)
+
+                elif stype in ("split", "single_metric"):
+                    week_value = None  # handled per-rater below
+
+                else:
+                    week_value = (6, 8)  # safe fallback
+
+                # ── create one rating per rater ─────────────────────────────
                 for rater_up, rater_role in [
                     (client_up,    "client"),
                     (caregiver_up, "caregiver"),
                 ]:
-                    # Plausible-but-varied scores, skewed positive (6–10)
-                    scores = {
-                        "care_fit_respect":          random.randint(6, 10),
-                        "communication_coordination": random.randint(6, 10),
-                        "reliability_consistency":    random.randint(6, 10),
-                        "workload_support_balance":   random.randint(5, 10),
-                    }
-                    notes_pool = [
-                        "",
-                        "Great session overall.",
-                        "Some scheduling adjustments needed.",
-                        "Communication was excellent this visit.",
-                        "Looking forward to continuing this relationship.",
-                        "Minor timing issues but resolved quickly.",
-                        "Very professional and attentive.",
-                    ]
+                    # ── build scores dict ───────────────────────────────────
+                    if stype == "split":
+                        if rater_role == "client":
+                            lo, hi = scenario["client_lo"], scenario["client_hi"]
+                        else:
+                            lo, hi = scenario["caregiver_lo"], scenario["caregiver_hi"]
+                        scores = {
+                            "care_fit_respect":           random.randint(lo, hi),
+                            "communication_coordination": random.randint(lo, hi),
+                            "reliability_consistency":    random.randint(lo, hi),
+                            "workload_support_balance":   random.randint(lo, hi),
+                        }
+
+                    elif stype == "single_metric":
+                        d_lo = scenario["default_lo"]
+                        d_hi = scenario["default_hi"]
+                        o_metric = scenario["override_metric"]
+                        o_lo = scenario["override_lo"]
+                        o_hi = scenario["override_hi"]
+                        scores = {
+                            "care_fit_respect":           random.randint(d_lo, d_hi),
+                            "communication_coordination": random.randint(d_lo, d_hi),
+                            "reliability_consistency":    random.randint(d_lo, d_hi),
+                            "workload_support_balance":   random.randint(d_lo, d_hi),
+                        }
+                        scores[o_metric] = random.randint(o_lo, o_hi)
+
+                    else:
+                        lo, hi = week_value
+                        scores = {
+                            "care_fit_respect":           random.randint(lo, hi),
+                            "communication_coordination": random.randint(lo, hi),
+                            "reliability_consistency":    random.randint(lo, hi),
+                            "workload_support_balance":   random.randint(lo, hi),
+                        }
+
+                    # ── sentiment-appropriate notes ─────────────────────────
+                    avg_score = sum(scores.values()) / len(scores)
+                    notes_text = _notes_for_score(avg_score)
 
                     ScheduleEntryRating.objects.get_or_create(
                         schedule_entry=entry,
@@ -592,7 +807,7 @@ class Command(BaseCommand):
                         rating_date=occurrence_date,
                         defaults={
                             "rater_role": rater_role,
-                            "notes": random.choice(notes_pool),
+                            "notes": notes_text,
                             **scores,
                         },
                     )

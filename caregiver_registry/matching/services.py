@@ -614,9 +614,11 @@ def compute_ai_enhanced_match_score(caregiver, client, selected_tag_ids=None):
             "score": chatgpt_result["score"],
             "details": enhanced_details,
             "ai_reasoning": " ".join(reasoning_parts),
+            "ai_source": "chatgpt",
         }
 
     # 3. Fallback to local result
+    local_result["ai_source"] = "local_scoring_model"
     return local_result
 
 
@@ -639,6 +641,58 @@ def _selected_tag_keys(tag_ids):
         keys.add(t.name.replace("-", "_"))
         labels.append(t.label)
     return keys, labels
+
+
+def filter_caregivers_by_tags(client, organization, tag_ids=None, limit=10):
+    """Return approved caregivers matching the selected care-need tags.
+
+    This is intentionally a transparent, non-ranked workflow. It is the
+    baseline that users can inspect before choosing the AI-assisted ranking
+    workflow. The returned shape is deliberately small so the UI cannot imply
+    that a compatibility score was calculated.
+    """
+    from registry.models import OrganizationCaregiver
+
+    selected_keys, _ = _selected_tag_keys(tag_ids)
+    caregivers = OrganizationCaregiver.objects.filter(
+        organization=organization,
+        status="approved",
+    ).select_related("caregiver_profile__user_profile")
+
+    results = []
+    for relation in caregivers:
+        caregiver = relation.caregiver_profile
+        skills = set(caregiver.experience_with or [])
+        overlaps = sorted(selected_keys & skills) if selected_keys else []
+        if selected_keys and not overlaps:
+            continue
+        results.append({"caregiver": caregiver, "criteria_matches": overlaps})
+
+    results.sort(key=lambda item: item["caregiver"].user_profile.display_name.lower())
+    return results[:limit]
+
+
+def filter_clients_by_tags(caregiver, organization, tag_ids=None, limit=10):
+    """Return approved clients matching selected tags without ranking them."""
+    from registry.models import OrganizationClient
+
+    selected_keys, _ = _selected_tag_keys(tag_ids)
+    clients = OrganizationClient.objects.filter(
+        organization=organization,
+        status="approved",
+    ).select_related("client_profile__user_profile")
+
+    results = []
+    for relation in clients:
+        client = relation.client_profile
+        needs = set(client.care_needs or [])
+        overlaps = sorted(selected_keys & needs) if selected_keys else []
+        if selected_keys and not overlaps:
+            continue
+        results.append({"client": client, "criteria_matches": overlaps})
+
+    results.sort(key=lambda item: item["client"].user_profile.display_name.lower())
+    return results[:limit]
 
 
 def find_best_caregivers_for_client(client, organization, limit=5, tag_ids=None):
@@ -680,6 +734,7 @@ def find_best_caregivers_for_client(client, organization, limit=5, tag_ids=None)
             "score": result["score"],
             "details": result["details"],
             "ai_reasoning": result["ai_reasoning"],
+            "ai_source": result.get("ai_source", "local_scoring_model"),
             "criteria_matches": criteria_matches,
         })
 
@@ -725,6 +780,7 @@ def find_best_clients_for_caregiver(caregiver, organization, limit=5, tag_ids=No
             "score": result["score"],
             "details": result["details"],
             "ai_reasoning": result["ai_reasoning"],
+            "ai_source": result.get("ai_source", "local_scoring_model"),
             "criteria_matches": criteria_matches,
         })
 

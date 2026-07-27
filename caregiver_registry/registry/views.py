@@ -453,6 +453,11 @@ def client_dashboard(request):
     ).prefetch_related("entries").order_by("-created_at")
     my_schedules = Paginator(my_schedules_qs, 10).get_page(request.GET.get("schedules_page", 1))
 
+    # Approved schedules only — shown in the per-entry view at the top (for Rate shortcuts)
+    approved_schedules = list(
+        my_schedules_qs.filter(status="approved")
+    )
+
     return render(request, "registry/client_dashboard.html", {
         "client_profile": client_profile,
         "pending_my_approval": pending_my_approval,
@@ -462,6 +467,7 @@ def client_dashboard(request):
         "unread_notifications": unread_notifications,
         "coordinators": coordinators,
         "my_schedules": my_schedules,
+        "approved_schedules": approved_schedules,
     })
 
 
@@ -481,6 +487,8 @@ def registry_network(request):
     from matching.services import (
         find_best_clients_for_caregiver,
         find_best_caregivers_for_client,
+        filter_clients_by_tags,
+        filter_caregivers_by_tags,
     )
     from registry.models import CaregiverProfile, ClientProfile
 
@@ -502,6 +510,7 @@ def registry_network(request):
     ai_mode = request.GET.get("ai") == "1"  # True when user clicked "✨ AI Match"
     match_results = None       # Only populated after the user submits criteria
     match_direction = None     # "find_clients" or "find_caregivers"
+    result_template = "registry/_registry_tag_results.html"
 
     # ── Caregiver: they are the caregiver; select tags to find matching clients ──
     if user_role == "caregiver":
@@ -526,21 +535,33 @@ def registry_network(request):
         match_direction = "find_clients"
 
         if tag_ids or ai_mode:
-            # Score all eligible clients against this caregiver in their orgs
-            from matching.services import find_best_clients_for_caregiver as _find
-            raw_results = []
-            seen_client_ids = set()
-            for org_id in caregiver_org_ids:
-                from organizations.models import Organization
-                try:
-                    org_obj = Organization.objects.get(pk=org_id)
-                except Organization.DoesNotExist:
-                    continue
-                for r in _find(caregiver_profile, org_obj, limit=200, tag_ids=tag_ids or None):
-                    if r["client"].pk not in seen_client_ids:
-                        seen_client_ids.add(r["client"].pk)
-                        raw_results.append(r)
-            raw_results.sort(key=lambda x: x["score"], reverse=True)
+            if ai_mode:
+                # AI mode scores all eligible clients against this caregiver.
+                from matching.services import find_best_clients_for_caregiver as _find
+                result_template = "registry/_registry_match_results.html"
+                raw_results = []
+                seen_client_ids = set()
+                for org_id in caregiver_org_ids:
+                    from organizations.models import Organization
+                    try:
+                        org_obj = Organization.objects.get(pk=org_id)
+                    except Organization.DoesNotExist:
+                        continue
+                    for r in _find(caregiver_profile, org_obj, limit=200, tag_ids=tag_ids or None):
+                        if r["client"].pk not in seen_client_ids:
+                            seen_client_ids.add(r["client"].pk)
+                            raw_results.append(r)
+                raw_results.sort(key=lambda x: x["score"], reverse=True)
+            else:
+                raw_results = []
+                for org_id in caregiver_org_ids:
+                    from organizations.models import Organization
+                    try:
+                        org_obj = Organization.objects.get(pk=org_id)
+                    except Organization.DoesNotExist:
+                        continue
+                    raw_results.extend(filter_clients_by_tags(caregiver_profile, org_obj, tag_ids=tag_ids, limit=200))
+                raw_results.sort(key=lambda x: x["client"].user_profile.display_name.lower())
             all_results = raw_results
             match_results = Paginator(all_results, 10).get_page(request.GET.get("page", 1))
 
@@ -553,6 +574,8 @@ def registry_network(request):
             "match_direction": match_direction,
             "match_results": match_results,
             "caregiver_profile": caregiver_profile,
+            "result_template": result_template,
+            "ai_mode": ai_mode,
         })
 
     # ── Client: they are the client; select tags to find matching caregivers ──
@@ -571,20 +594,32 @@ def registry_network(request):
         match_direction = "find_caregivers"
 
         if tag_ids or ai_mode:
-            from matching.services import find_best_caregivers_for_client as _find
-            raw_results = []
-            seen_cg_ids = set()
-            for org_id in client_org_ids:
-                from organizations.models import Organization
-                try:
-                    org_obj = Organization.objects.get(pk=org_id)
-                except Organization.DoesNotExist:
-                    continue
-                for r in _find(client_profile, org_obj, limit=200, tag_ids=tag_ids):
-                    if r["caregiver"].pk not in seen_cg_ids:
-                        seen_cg_ids.add(r["caregiver"].pk)
-                        raw_results.append(r)
-            raw_results.sort(key=lambda x: x["score"], reverse=True)
+            if ai_mode:
+                from matching.services import find_best_caregivers_for_client as _find
+                result_template = "registry/_registry_match_results.html"
+                raw_results = []
+                seen_cg_ids = set()
+                for org_id in client_org_ids:
+                    from organizations.models import Organization
+                    try:
+                        org_obj = Organization.objects.get(pk=org_id)
+                    except Organization.DoesNotExist:
+                        continue
+                    for r in _find(client_profile, org_obj, limit=200, tag_ids=tag_ids):
+                        if r["caregiver"].pk not in seen_cg_ids:
+                            seen_cg_ids.add(r["caregiver"].pk)
+                            raw_results.append(r)
+                raw_results.sort(key=lambda x: x["score"], reverse=True)
+            else:
+                raw_results = []
+                for org_id in client_org_ids:
+                    from organizations.models import Organization
+                    try:
+                        org_obj = Organization.objects.get(pk=org_id)
+                    except Organization.DoesNotExist:
+                        continue
+                    raw_results.extend(filter_caregivers_by_tags(client_profile, org_obj, tag_ids=tag_ids, limit=200))
+                raw_results.sort(key=lambda x: x["caregiver"].user_profile.display_name.lower())
             match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
 
         return render(request, "registry/network_registry.html", {
@@ -596,6 +631,8 @@ def registry_network(request):
             "match_direction": match_direction,
             "match_results": match_results,
             "client_profile": client_profile,
+            "result_template": result_template,
+            "ai_mode": ai_mode,
         })
 
     # ── Staff/Admin: toggle direction, pick one person, then see scored results ──
@@ -635,9 +672,15 @@ def registry_network(request):
                     pass
 
             if selected_caregiver and (tag_ids or ai_mode):
-                raw_results = find_best_clients_for_caregiver(
-                    selected_caregiver, organization, limit=200, tag_ids=tag_ids or None
-                )
+                if ai_mode:
+                    result_template = "registry/_registry_match_results.html"
+                    raw_results = find_best_clients_for_caregiver(
+                        selected_caregiver, organization, limit=200, tag_ids=tag_ids or None
+                    )
+                else:
+                    raw_results = filter_clients_by_tags(
+                        selected_caregiver, organization, tag_ids=tag_ids, limit=200
+                    )
                 match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
 
         else:  # find_caregivers
@@ -649,9 +692,15 @@ def registry_network(request):
                     pass
 
             if selected_client and (tag_ids or ai_mode):
-                raw_results = find_best_caregivers_for_client(
-                    selected_client, organization, limit=200, tag_ids=tag_ids or None
-                )
+                if ai_mode:
+                    result_template = "registry/_registry_match_results.html"
+                    raw_results = find_best_caregivers_for_client(
+                        selected_client, organization, limit=200, tag_ids=tag_ids or None
+                    )
+                else:
+                    raw_results = filter_caregivers_by_tags(
+                        selected_client, organization, tag_ids=tag_ids, limit=200
+                    )
                 match_results = Paginator(raw_results, 10).get_page(request.GET.get("page", 1))
 
         return render(request, "registry/network_registry.html", {
@@ -666,6 +715,8 @@ def registry_network(request):
             "org_clients": org_clients_qs,
             "selected_caregiver": selected_caregiver,
             "selected_client": selected_client,
+            "result_template": result_template,
+            "ai_mode": ai_mode,
         })
 
     else:
@@ -779,6 +830,12 @@ def org_dashboard(request):
         pending_client_matches    = paginate(pending_qs.filter(client_status="pending"), "p_cl")
         active_matches            = paginate(match_base.filter(status="active"), "p_act")
         declined_matches          = paginate(match_base.filter(status__in=["declined", "cancelled"]), "p_dec")
+
+        # ── Stability Snapshot: attach per-row snapshot to active match objects ──
+        from matching.stability import get_stability_snapshot as _get_stability_snapshot
+        for _m in active_matches.object_list:
+            _m.stability_snapshot = _get_stability_snapshot(_m)
+
     else:
         match_inquiries = pending_caregiver_matches = pending_client_matches = active_matches = declined_matches = None
 
@@ -1798,6 +1855,78 @@ def _is_admin_or_staff(request):
 # Schedule Entry Rating Views
 # =============================================================================
 
+def _generate_ratable_dates(schedule, entry, user_profile):
+    """
+    Return a list of (iso_str, label_str) tuples representing valid session
+    dates for *entry* that:
+
+    1. Fall on the correct weekday for entry.day_of_week
+    2. Are >= schedule.start_date
+    3. Are <= min(today, schedule.end_date)  [no future dates; no dates past end]
+    4. Respect the schedule's recurrence frequency
+    5. Have NOT already been rated by this user for this entry
+
+    Results are sorted most-recent first so the most recent unrated session
+    appears at the top of the dropdown.
+    """
+    from datetime import date, timedelta
+
+    _WEEKDAY_MAP = {
+        "monday": 0, "tuesday": 1, "wednesday": 2,
+        "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6,
+    }
+
+    target_weekday = _WEEKDAY_MAP.get(entry.day_of_week)
+    if target_weekday is None:
+        return []
+
+    # ── Determine interval in days ────────────────────────────────────────────
+    if schedule.frequency == "weekly":
+        interval_days = 7
+    elif schedule.frequency == "biweekly":
+        interval_days = 14
+    elif schedule.frequency == "custom" and schedule.custom_interval_weeks:
+        interval_days = schedule.custom_interval_weeks * 7
+    else:
+        interval_days = 7  # safe fallback
+
+    # ── Find the first valid occurrence on or after start_date ───────────────
+    start = schedule.start_date
+    days_ahead = (target_weekday - start.weekday()) % 7
+    first_occurrence = start + timedelta(days=days_ahead)
+
+    # ── Determine the upper bound ─────────────────────────────────────────────
+    today = date.today()
+    upper = today
+    if schedule.end_date and schedule.end_date < upper:
+        upper = schedule.end_date
+
+    # ── Already-rated dates by this user for this entry ───────────────────────
+    from .models import ScheduleEntryRating
+    already_rated = set(
+        ScheduleEntryRating.objects.filter(
+            schedule_entry=entry,
+            rater_profile=user_profile,
+        ).values_list("rating_date", flat=True)
+    )
+
+    # ── Walk forward generating occurrences ──────────────────────────────────
+    occurrences = []
+    cursor = first_occurrence
+    while cursor <= upper:
+        if cursor not in already_rated:
+            occurrences.append(cursor)
+        cursor += timedelta(days=interval_days)
+
+    # Most-recent first
+    occurrences.sort(reverse=True)
+
+    return [
+        (d.isoformat(), f"{d.strftime('%A, %B')} {d.day}, {d.year}")
+        for d in occurrences
+    ]
+
+
 @login_required
 def schedule_entry_rate(request, entry_pk):
     """
@@ -1807,7 +1936,6 @@ def schedule_entry_rate(request, entry_pk):
     """
     from .models import ScheduleEntry, ScheduleEntryRating
     from .forms import ScheduleEntryRatingForm
-    from django.db.models import Avg
 
     entry = get_object_or_404(
         ScheduleEntry.objects.select_related(
@@ -1848,7 +1976,10 @@ def schedule_entry_rate(request, entry_pk):
         )
         return redirect("schedule_detail", pk=schedule.pk)
 
-    # ── Existing rating by this user for this entry (if any) for pre-fill ────
+    # ── Compute valid, unrated date choices ───────────────────────────────────
+    date_choices = _generate_ratable_dates(schedule, entry, user_profile)
+
+    # ── Existing ratings by this user for this entry (for history table) ─────
     existing_ratings = ScheduleEntryRating.objects.filter(
         schedule_entry=entry,
         rater_profile=user_profile,
@@ -1856,7 +1987,7 @@ def schedule_entry_rate(request, entry_pk):
 
     # ── Handle form ───────────────────────────────────────────────────────────
     if request.method == "POST":
-        form = ScheduleEntryRatingForm(request.POST, entry=entry)
+        form = ScheduleEntryRatingForm(request.POST, entry=entry, date_choices=date_choices)
         if form.is_valid():
             cd = form.cleaned_data
             rating, created = ScheduleEntryRating.objects.update_or_create(
@@ -1876,10 +2007,9 @@ def schedule_entry_rate(request, entry_pk):
             messages.success(request, f"Rating {verb} for {entry.get_day_of_week_display()}.")
             return redirect("schedule_detail", pk=schedule.pk)
     else:
-        form = ScheduleEntryRatingForm(entry=entry)
+        form = ScheduleEntryRatingForm(entry=entry, date_choices=date_choices)
 
     # ── Context ───────────────────────────────────────────────────────────────
-    # Counterpart name (show who you're rating with)
     if rater_role == "client":
         counterpart_name = schedule.caregiver.user_profile.display_name
     else:
@@ -1892,6 +2022,7 @@ def schedule_entry_rate(request, entry_pk):
         "rater_role": rater_role,
         "counterpart_name": counterpart_name,
         "existing_ratings": existing_ratings,
+        "has_ratable_dates": bool(date_choices),
     })
 
 

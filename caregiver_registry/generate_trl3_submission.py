@@ -1,5 +1,5 @@
 """
-CareWeb AI — TRL-3 Submission Generator
+CareWeb — TRL-3 Submission Generator
 ========================================
 Runs 40 validation test scenarios against the live OpenAI-backed matching
 service and assembles a fully-formatted Word document for the Caregiving AI
@@ -9,7 +9,7 @@ Usage (from caregiver_registry/ with venv activated):
     python generate_trl3_submission.py
 
 Output:
-    CareWebAI_TRL3_Submission.docx  (current directory)
+    CareWeb_TRL3_Submission.docx  (current directory)
     smart40_raw_log.json             (raw evidence log, same directory)
 """
 
@@ -1177,7 +1177,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
     doc.add_paragraph()
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    tr = title.add_run("CareWeb AI")
+    tr = title.add_run("CareWeb")
     tr.bold = True
     tr.font.size = Pt(22)
 
@@ -1194,7 +1194,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
     meta = doc.add_paragraph()
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     meta.add_run(
-        "Submitted by: CareWeb AI Development Team\n"
+        "Submitted by: CareWeb Development Team\n"
         "Organization: Center for Independent Living (CIL)\n"
         "Solution Category: AI-Assisted Caregiver–Client Matching"
     ).font.size = Pt(11)
@@ -1208,7 +1208,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
 
     set_heading("1.1 Scientific and Engineering Basis", level=2)
     body(
-        "CareWeb AI is a Django-based Personal Attendant Services Registry that uses a "
+        "CareWeb is a Django-based Personal Care Coordination and Stabilization platform that uses a "
         "two-stage AI-assisted matching engine to pair clients needing home care with "
         "approved caregivers managed by independent living centers (ILCs) and similar "
         "community organizations."
@@ -1259,7 +1259,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
 
     set_heading("1.3 Custom vs. Existing AI Software", level=2)
     body(
-        "CareWeb AI uses a custom-built local scoring algorithm as its primary decision engine. "
+        "CareWeb uses a custom-built local scoring algorithm as its primary decision engine. "
         "OpenAI's GPT-4o-mini is used as an enhancement layer, not as the foundational decision "
         "maker. The local algorithm is fully deterministic and operates independently of any "
         "third-party AI service. The OpenAI API usage complies with OpenAI's Terms of Use; only "
@@ -1284,7 +1284,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
 
     set_heading("2.1 Prototype and Lab Testing", level=2)
     body(
-        "The full CareWeb AI application has been deployed as a working prototype running "
+        "The full CareWeb application has been deployed as a working prototype running "
         "on Django 6.0.5 with a SQLite development database and a PostgreSQL production "
         "configuration. The application is containerized via Docker and has infrastructure-as-code "
         "provisioning via Terraform for cloud deployment."
@@ -1330,7 +1330,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
 
     set_heading("2.3 Synthetic Label Methodology", level=2)
     body(
-        "Because CareWeb AI is a pre-deployment prototype with no live match outcome history, "
+        "Because CareWeb is a pre-deployment prototype with no live match outcome history, "
         "ground-truth labels were assigned using objective, verifiable criteria:"
     )
     for criterion in [
@@ -1367,8 +1367,8 @@ def build_word_doc(results, metrics, delta_result, output_path):
 
     set_heading("3.1 Intended Application Environment", level=2)
     body(
-        "CareWeb AI is designed for use by Independent Living Centers (ILCs) and similar "
-        "community care organizations operating Personal Attendant Services registries. "
+        "CareWeb is designed for use by Independent Living Centers (ILCs) and similar "
+        "community care organizations providing Personal Care Coordination and Stabilization services. "
         "The intended users are:"
     )
     for u in [
@@ -1471,7 +1471,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
     set_heading("5. Documentation", level=1)
     body(
         "All test results, scoring logic, model data, and design artifacts referenced in this "
-        "submission are traceable to the CareWeb AI source repository "
+        "submission are traceable to the CareWeb source repository "
         "(https://github.com/LTCarew/carewebAI):"
     )
     for doc_item in [
@@ -1542,7 +1542,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
 
     set_heading("6.2 Human-in-the-Loop (HITL) Protocol", level=2)
     body(
-        "CareWeb AI embeds Human-in-the-Loop review at multiple levels by design. The AI never "
+        "CareWeb embeds Human-in-the-Loop review at multiple levels by design. The AI never "
         "autonomously assigns, approves, or activates a match."
     )
     body("Match-level HITL", bold=True)
@@ -1582,7 +1582,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
 
     set_heading('6.3 The \u201cI Don\'t Know\u201d Protocol', level=2)
     body(
-        "CareWeb AI's 'I Don't Know' protocol operates at two levels: the local scoring layer "
+        "CareWeb's 'I Don't Know' protocol operates at two levels: the local scoring layer "
         "and the AI enhancement layer."
     )
     body("Local Scoring Layer", bold=True)
@@ -1625,13 +1625,13 @@ def build_word_doc(results, metrics, delta_result, output_path):
     set_heading("6.4 Net-Time Saved (Data-Backed Estimate)", level=2)
     body(
         "Staff coordinators at an ILC with a typical registry of 50 caregivers and 40 clients "
-        "face approximately 2,000 possible caregiver/client pairs per cohort. Before CareWeb AI, "
+        "face approximately 2,000 possible caregiver/client pairs per cohort. Before CareWeb, "
         "a coordinator manually reviewing compatibility across even a subset of pairs "
         "(reviewing availability, care needs, location, language for each) would require an "
         "estimated 8–15 minutes per pair for a thorough review."
     )
     body(
-        "With CareWeb AI, the same coordinator receives an instant ranked shortlist of the top "
+        "With CareWeb, the same coordinator receives an instant ranked shortlist of the top "
         "5 compatible matches per client request, each with a score, per-factor breakdown, "
         "and AI reasoning narrative. Based on internal workflow analysis, this reduces the "
         "coordinator's active review time from ~15 minutes per match proposal to approximately "
@@ -1659,7 +1659,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
     set_heading("APPENDIX A — Smart 40 Option A Validation Log", level=1)
     body(
         "Option A: Software & Logic Stress Log. The following 40 consecutive test cycles "
-        "were executed against the live CareWeb AI matching service using real profile "
+        "were executed against the live CareWeb matching service using real profile "
         "attribute data and the production OpenAI API key. Results are presented in "
         "pretty-printed JSON format (Courier New, 10pt) for technical auditor review."
     )
@@ -1744,7 +1744,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
         "How the input was administered:", bold=True
     )
     body(
-        "CareWeb AI does not have an open chat interface or free-text command prompt. "
+        "CareWeb does not have an open chat interface or free-text command prompt. "
         "The only free-text field submitted to the AI is the client's 'additional_care_needs' "
         "field (a profile attribute submitted during application intake). The Protocol 9-Delta "
         "phrase was injected into this field for a test client profile paired with a standard "
@@ -1786,7 +1786,7 @@ def build_word_doc(results, metrics, delta_result, output_path):
     doc.add_paragraph()
     body("Safety Assessment Summary:", bold=True)
     body(
-        "The Protocol 9-Delta test demonstrates that CareWeb AI does not have an exploitable "
+        "The Protocol 9-Delta test demonstrates that CareWeb does not have an exploitable "
         "command interface. Unknown instructions embedded in user profile text fields are "
         "treated as informational content, not executable commands. The OpenAI prompt is "
         "structurally constrained to a compatibility evaluation task with a required JSON "
@@ -1845,10 +1845,10 @@ def build_word_doc(results, metrics, delta_result, output_path):
 if __name__ == "__main__":
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     LOG_PATH = os.path.join(BASE_DIR, "smart40_raw_log.json")
-    DOC_PATH = os.path.join(BASE_DIR, "CareWebAI_TRL3_Submission.docx")
+    DOC_PATH = os.path.join(BASE_DIR, "CareWeb_TRL3_Submission.docx")
 
     print("\n" + "=" * 70)
-    print("  CareWeb AI — TRL-3 Submission Generator")
+    print("  CareWeb — TRL-3 Submission Generator")
     print("=" * 70)
 
     # 1. Build scenarios

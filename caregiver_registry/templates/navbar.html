@@ -1,7 +1,7 @@
 <nav class="navbar app-navbar" role="navigation" aria-label="Main Navigation">
     <div class="navbar-brand">
         <a class="navbar-item app-logo" href="/">
-            CareWeb AI
+            CareWeb
         </a>
 
         <button
@@ -24,7 +24,7 @@
 
             {% if user.is_authenticated %}
                 <a class="navbar-item" href="/dashboard/">Dashboard</a>
-                <a class="navbar-item" href="{% url 'registry_network' %}">Registry</a>
+                <a class="navbar-item" href="{% url 'registry_network' %}">Network</a>
             {% endif %}
         </div>
 

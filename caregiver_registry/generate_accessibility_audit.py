@@ -1,8 +1,9 @@
+
 """
-CareWeb AI — Accessibility Audit Document Generator
+CareWeb — Accessibility Audit Document Generator
 ====================================================
 
-Creates a grant-ready Word document documenting the CareWeb AI accessibility
+Creates a grant-ready Word document documenting the CareWeb accessibility
 review.  The document follows the same general format as
 ``CareWebAI_TRL3_Submission.docx``: cover page, numbered sections, tables,
 bulleted findings, and appendices.
@@ -17,7 +18,7 @@ Usage (from caregiver_registry/):
     venv/Scripts/python.exe generate_accessibility_audit.py
 
 Output:
-    CareWebAI_Accessibility_Audit.docx
+    CareWeb_Accessibility_Audit.docx
 """
 
 from datetime import datetime
@@ -133,7 +134,7 @@ def build_document(output_path):
     doc.add_paragraph()
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title.add_run("CareWeb AI")
+    run = title.add_run("CareWeb")
     run.bold = True
     run.font.name = "Arial"
     run.font.size = Pt(22)
@@ -154,9 +155,9 @@ def build_document(output_path):
     meta = doc.add_paragraph()
     meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = meta.add_run(
-        "Prepared by: CareWeb AI Development Team\n"
+        "Prepared by: CareWeb Development Team\n"
         "Organization: Center for Independent Living (CIL)\n"
-        "Product: AI-Assisted Personal Attendant Services Registry\n"
+        "Product: Personal Care Coordination and Stabilization\n"
         "Review type: Static source-code accessibility audit"
     )
     run.font.name = "Arial"
@@ -168,14 +169,14 @@ def build_document(output_path):
     # ---------------------------------------------------------------------
     heading("1. Executive Summary")
     body(
-        "CareWeb AI was reviewed against the principles and applicable success "
+        "CareWeb was reviewed against the principles and applicable success "
         "criteria of the Web Content Accessibility Guidelines (WCAG) 2.1 Level AA. "
         "The review covered the shared layout, navigation, authentication, application "
         "forms, dashboards, matching tables, stability monitoring, rating workflow, "
         "CSS, and JavaScript interactions present in the repository."
     )
     body(
-        "Overall assessment: PARTIAL CONFORMANCE / REMEDIATION REQUIRED. The application "
+        "Overall assessment: PARTIAL CONFORMANCE / REMEDIATION REQUIRED. The CareWeb application "
         "already contains several accessibility-supportive design decisions, including "
         "semantic landmarks, explicit form labels, keyboard-visible focus styling, "
         "table header scopes in major dashboard views, text labels alongside status colors, "
@@ -531,7 +532,7 @@ def build_document(output_path):
     # ---------------------------------------------------------------------
     heading("6. Grant-Ready Accessibility Statement")
     body(
-        "CareWeb AI has completed a WCAG 2.1 AA-oriented source-code accessibility review of "
+        "CareWeb has completed a WCAG 2.1 AA-oriented source-code accessibility review of "
         "its shared layout, navigation, forms, dashboards, matching workflow, stability tools, "
         "and responsive styling. The review identified existing strengths, including semantic "
         "landmarks, explicit form labels, visible keyboard focus, accessible table structures, "
@@ -610,15 +611,15 @@ def build_document(output_path):
     )
 
     # Basic document metadata makes the generated file easier to identify.
-    doc.core_properties.title = "CareWeb AI Accessibility Audit"
+    doc.core_properties.title = "CareWeb Accessibility Audit"
     doc.core_properties.subject = "WCAG 2.1 AA-oriented static accessibility review"
-    doc.core_properties.author = "CareWeb AI Development Team"
-    doc.core_properties.comments = "Generated from the CareWeb AI source-code accessibility review."
+    doc.core_properties.author = "CareWeb Development Team"
+    doc.core_properties.comments = "Generated from the CareWeb source-code accessibility review."
     doc.save(output_path)
 
 
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    output = os.path.join(base_dir, "CareWebAI_Accessibility_Audit.docx")
+    output = os.path.join(base_dir, "CareWeb_Accessibility_Audit.docx")
     build_document(output)
     print(f"Document saved: {output}")

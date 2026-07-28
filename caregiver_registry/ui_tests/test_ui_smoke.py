@@ -1,5 +1,5 @@
 """
-ui_tests/test_ui_smoke.py — CareWeb AI Browser-Level UI Smoke Test Suite
+ui_tests/test_ui_smoke.py — CareWeb Browser-Level UI Smoke Test Suite
 =========================================================================
 
 Uses Django's StaticLiveServerTestCase (runs a real HTTP server) combined

@@ -1,8 +1,8 @@
-# CareWeb AI
+# CareWeb
 
 > **AI-assisted caregiver-client matching registry for Independent Living Centers**
 
-CareWeb AI is a full-stack Django web application that automates the caregiver discovery, placement, and stability monitoring workflow for home-care organizations. It uses GPT-4o to score compatibility between caregivers and clients, tracks placement health over time via a **Stability Module**, and gives org administrators a single dashboard to manage their entire care workforce.
+CareWeb is a full-stack Django web application that automates the caregiver discovery, placement, and stability monitoring workflow for home-care organizations. It uses GPT-4o to score compatibility between caregivers and clients, tracks placement health over time via a **Stability Module**, and gives org administrators a single dashboard to manage their entire care workforce.
 
 ---
 
@@ -26,7 +26,7 @@ CareWeb AI is a full-stack Django web application that automates the caregiver d
 
 ## App Description
 
-CareWeb AI bridges the gap between caregivers seeking employment and clients who need care — within the context of an Independent Living Center (ILC) or similar nonprofit organization.
+CareWeb bridges the gap between caregivers seeking employment and clients who need care — within the context of an Independent Living Center (ILC) or similar nonprofit organization.
 
 **The core workflow:**
 
@@ -40,7 +40,7 @@ Caregiver applies ──► Org reviews ──► AI matches caregiver ↔ clien
                              Flag matches for stabilization review
 ```
 
-The platform is designed for organizations that currently manage their caregiver registry in spreadsheets or paper files. CareWeb AI replaces that with a structured, AI-enhanced digital registry with full audit trails.
+The platform is designed for organizations that currently manage their Personal Care Coordination and Stabilization workflows in spreadsheets or paper files. CareWeb replaces that with a structured, AI-enhanced digital registry with full audit trails.
 
 ---
 
@@ -484,4 +484,4 @@ MIT License — see `LICENSE` for details.
 
 ---
 
-*CareWeb AI — Empowering Independent Living Centers with intelligent caregiver matching.*
+*CareWeb — Empowering Independent Living Centers with intelligent caregiver matching.*

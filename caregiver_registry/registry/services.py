@@ -341,7 +341,7 @@ def send_coordinator_invite(client_profile, email, invited_by_user):
     message = f"""
 Hello,
 
-{client_profile.user_profile.display_name} has invited you to be their Support Coordinator on CareWeb AI.
+{client_profile.user_profile.display_name} has invited you to be their Support Coordinator on CareWeb.
 
 As a Support Coordinator, you can help manage care needs and assist with finding careworkers (people providing support).
 
@@ -354,7 +354,7 @@ This invitation will expire in 7 days.
 If you have any questions, please contact us.
 
 Best regards,
-The CareWeb AI Team
+The CareWeb Team
     """.strip()
     
     send_mail(
@@ -533,12 +533,12 @@ def send_approval_email(org_relationship):
     login_url = f"{settings.SITE_URL}/accounts/login/"
     
     # Email subject
-    subject = f"Your {role_name} Application Has Been Approved - CareWeb AI"
+    subject = f"Your {role_name} Application Has Been Approved - CareWeb"
     
     # Email body
     message = f"""Hello {user_profile.display_name},
 
-Great news! {organization.name} has approved your {role_name.lower()} application on CareWeb AI.
+Great news! {organization.name} has approved your {role_name.lower()} application on CareWeb.
 
 You can now login to your account and access the caregiver/client registry:
 
@@ -550,10 +550,10 @@ Once logged in, you'll be able to:
 - Browse the {"client" if is_caregiver else "careworker"} registry
 - Connect with potential {"clients" if is_caregiver else "careworkers"}
 
-Welcome to the CareWeb AI network!
+Welcome to the CareWeb network!
 
 Best regards,
-The CareWeb AI Team
+The CareWeb Team
 """.strip()
     
     # Send the email
@@ -635,12 +635,12 @@ def send_staff_invite(organization, email, role, invited_by_user,
 
     role_display = "Administrator" if role == "admin" else "Staff"
     subject = (
-        f"Invitation to join {organization.name} as {role_display} — CareWeb AI"
+        f"Invitation to join {organization.name} as {role_display} — CareWeb"
     )
     message = f"""Hello,
 
 {invited_by_user.get_full_name() or invited_by_user.username} has invited you to join
-{organization.name} as a {role_display} on CareWeb AI.
+{organization.name} as a {role_display} on CareWeb.
 
 As {role_display}, you will have access to the organization dashboard where you can
 manage caregiver and client applications.
@@ -654,7 +654,7 @@ This invitation will expire in 7 days.
 If you did not expect this invitation, you can safely ignore this email.
 
 Best regards,
-The CareWeb AI Team
+The CareWeb Team
 """.strip()
 
     send_mail(

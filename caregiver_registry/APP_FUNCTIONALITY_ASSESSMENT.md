@@ -1,4 +1,4 @@
-# CareWeb AI — Full Application Functionality Assessment
+# CareWeb — Full Application Functionality Assessment
 **Role:** Senior Software Engineer  
 **Date:** July 22, 2026  
 **Branch:** `feature/stability`  
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-CareWeb AI is a Django 4.x web application that provides a caregiver-client matching registry for Independent Living Centers (ILCs) and similar home-care organizations. The platform supports the full lifecycle from initial application → staff review → AI-assisted matching → active placement → ongoing match stability monitoring.
+CareWeb is a Django 4.x web application that provides a Personal Care Coordination and Stabilization platform for Independent Living Centers (ILCs) and similar home-care organizations. The platform supports the full lifecycle from initial application → staff review → AI-assisted matching → active placement → ongoing match stability monitoring.
 
 This assessment covers every major functional area as of the `feature/stability` branch, documents the test suite, and notes areas requiring future attention.
 
@@ -316,4 +316,4 @@ The seeder creates:
 
 ---
 
-*Assessment prepared by Senior Software Engineer — CareWeb AI project, July 2026.*
+*Assessment prepared by Senior Software Engineer — CareWeb project, July 2026.*

@@ -1,5 +1,5 @@
 """
-Capture presentation-ready CareWeb AI user-journey screenshots.
+Capture presentation-ready CareWeb user-journey screenshots.
 
 This is deliberately a standalone Django/Selenium runner rather than a test
 case. It creates an isolated test database, loads the real CIL-Care demo data,
@@ -13,6 +13,7 @@ Output:
     screenshots/careworker/*.png
     screenshots/staff_admin/*.png
     screenshots/client/*.png
+    screenshots/support_person/*.png
     screenshots/manifest.json
 """
 
@@ -82,6 +83,25 @@ class JourneyCapture(StaticLiveServerTestCase):
     """Use Django's test DB/live server while producing artifacts, not asserts."""
 
     @classmethod
+    def _setup_coordinator_invite(cls):
+        """Create a CoordinatorInvite for the demo client for the support-person journey."""
+        from registry.models import CoordinatorInvite
+        from django.utils import timezone
+        import uuid
+        try:
+            client_profile = cls.client_user.profile.client_profile
+            cls.coordinator_invite = CoordinatorInvite.objects.create(
+                client_profile=client_profile,
+                email="demo-coordinator@example.com",
+                invited_by=cls.client_user,
+                token=uuid.uuid4(),
+                expires_at=timezone.now() + timezone.timedelta(days=7),
+            )
+        except Exception as exc:
+            print(f"  [coordinator invite setup skipped: {exc}]")
+            cls.coordinator_invite = None
+
+    @classmethod
     def setUpClass(cls):
         super().setUpClass()
         # The normal test settings deliberately disable network calls. The
@@ -120,6 +140,7 @@ class JourneyCapture(StaticLiveServerTestCase):
         cls.entry = ScheduleEntry.objects.filter(schedule=cls.schedule).first()
         if not cls.entry:
             raise RuntimeError("Seeded schedule entry could not be found")
+        cls._setup_coordinator_invite()
 
     @classmethod
     def tearDownClass(cls):
@@ -131,7 +152,7 @@ class JourneyCapture(StaticLiveServerTestCase):
 
     def setUp(self):
         self.manifest = []
-        for persona in ("careworker", "staff_admin", "client"):
+        for persona in ("careworker", "staff_admin", "client", "support_person"):
             (OUTPUT_DIR / persona).mkdir(parents=True, exist_ok=True)
 
     def _login(self, user):
@@ -285,7 +306,7 @@ class JourneyCapture(StaticLiveServerTestCase):
         return reverse("match_stability_detail", args=[match.pk])
 
     def test_capture_all_journeys(self):
-        """Capture all three persona journeys into the configured output folder."""
+        """Capture all four persona journeys into the configured output folder."""
         # Shared introduction screens are captured once for each persona folder
         # so each journey can be presented independently.
         tag_id = self._tag_id()
@@ -300,8 +321,8 @@ class JourneyCapture(StaticLiveServerTestCase):
                 self.careworker,
                 [
                     ("Apply as Careworker", "Join the careworker registry", "This public application form is where a person providing support begins. It collects the information needed for organizational review and later matching, without requiring an account first.", reverse("caregiver_apply")),
-                    ("Home", "What CareWeb AI is", "The public landing page introduces CareWeb AI as a coordination and matching workspace for people receiving support, careworkers, and organizations.", reverse("home")),
-                    ("Login", "Secure role-based access", "The login screen is the entry point for role-specific dashboards. CareWeb AI uses the signed-in user's role and organization membership to show the appropriate tools.", reverse("login")),
+                    ("Home", "What CareWeb is", "The public landing page introduces CareWeb as a Personal Care Coordination and Stabilization workspace for people receiving support, careworkers, and organizations.", reverse("home")),
+                    ("Login", "Secure role-based access", "The login screen is the entry point for role-specific dashboards. CareWeb uses the signed-in user's role and organization membership to show the appropriate tools.", reverse("login")),
                     ("Careworker Dashboard", "Personal work overview", "The careworker dashboard summarizes active relationships, schedules, pending actions, and links to the careworker's profile and matching tools.", reverse("caregiver_dashboard")),
                     ("Careworker Profile", "Skills and availability", "The profile presents the information used for compatibility: experience, location, availability, languages, transportation, preferences, and notes. The careworker can review and update these sections.", reverse("caregiver_profile")),
                     ("Tag Matching — Find Clients", "Filter possible clients by care criteria", "The careworker selects one or more care tags and uses Find Clients. Results show the relevant client, compatibility information, overlapping tags, and the option to request a match.", reverse("registry_network") + f"?tag_ids={tag_id}"),
@@ -330,9 +351,9 @@ class JourneyCapture(StaticLiveServerTestCase):
                 self.client_user,
                 [
                     ("Apply for Support", "Join the client registry", "This public application form is where a person looking for support begins. It collects care needs and personal context for organizational review and later matching.", reverse("client_apply")),
-                    ("Home", "Understand the service", "The landing page explains the purpose of the registry and provides clear paths for people seeking support, careworkers, and organizations.", reverse("home")),
+                    ("Home", "Understand the service", "The landing page explains the purpose of the Personal Care Coordination and Stabilization service and provides clear paths for people seeking support, careworkers, and organizations.", reverse("home")),
                     ("Login", "Client account access", "The client signs in to see their own care coordination workspace and information, separate from staff and careworker views.", reverse("login")),
-                    ("Client Dashboard", "Manage support coordination", "The client dashboard summarizes matches, schedules, approvals, session information, and invitations for a support person or coordinator.", reverse("client_dashboard")),
+                    ("Client Dashboard", "Manage support coordination", "The client dashboard summarizes matches, schedules, approvals, session information, and invitations for a support person.", reverse("client_dashboard")),
                     ("Client Profile", "Describe personal care preferences", "The client profile captures care needs, programs, availability, languages, scheduling preferences, and other context so matching can reflect the client's circumstances.", reverse("client_profile")),
                     ("Tag Matching — Find Careworkers", "Filter careworkers by care needs", "The client selects one or more care-needs tags and uses Find Careworkers. Results show potential careworkers, matched criteria, explanations, and a client-controlled Request Match action.", reverse("registry_network") + f"?tag_ids={tag_id}"),
                     ("AI Matching — Client", "AI-assisted careworker suggestions", "The AI Match action ranks careworkers against the client's needs, availability, and selected tags, and displays reasoning so the client can make an informed choice.", reverse("registry_network") + f"?tag_ids={tag_id}&ai=1"),
@@ -378,6 +399,81 @@ class JourneyCapture(StaticLiveServerTestCase):
                     "After staff submits the real flag action, the page confirms the relationship is flagged, identifies the request, and shows the updated Support Flags signal.",
                     f"form[action*='/stabilization-review/'] button[type='submit']",
                 )
+
+        # ── Support Person Journey ─────────────────────────────────────────────
+        # Shows the invite-based onboarding path: client sends an invite, the
+        # invitee accepts via the unique email link, creates an account, and
+        # arrives at their own focused dashboard.
+        if self.coordinator_invite:
+            try:
+                # Step 1: Client Dashboard — show the "Invite Support Person" button
+                self._login(self.client_user)
+                self._capture(
+                    "support_person", 1,
+                    "Client Dashboard — Invite Support Person",
+                    "Client initiates the support-person invitation",
+                    "The client dashboard shows the 'Invite a Support Person' button. Clicking it opens a simple form where the client enters the email address of the person they want to involve in their Personal Care Coordination and Stabilization.",
+                    reverse("client_dashboard"),
+                )
+
+                # Step 2: Invite Support Person form
+                self._capture(
+                    "support_person", 2,
+                    "Invite a Support Person",
+                    "Client sends a secure email invitation",
+                    "The client enters the support person's email address. The system sends a unique single-use link so the invitee can create an account and accept the role without a separate registration process.",
+                    reverse("coordinator_invite_send"),
+                )
+
+                # Step 3: Coordinator Signup acceptance page (public invite link, no auth)
+                self.driver.delete_all_cookies()
+                signup_path = reverse("coordinator_signup", args=[self.coordinator_invite.token])
+                self.driver.get(f"{self.live_server_url}{signup_path}")
+                self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+                time.sleep(0.4)
+                self._capture_current_page(
+                    "support_person", 3,
+                    "Accept Support Person Invitation",
+                    "Invitee creates their account via email link",
+                    "The invited person arrives at this page from their unique email link. They fill in their name, set a password, provide a phone number, contact preferences, and describe their relationship to the client. On submit they are logged in automatically and directed to their dashboard.",
+                    signup_path,
+                )
+
+                # Fill and submit the signup form to create the coordinator account
+                self.driver.find_element(By.NAME, "first_name").send_keys("Demo")
+                self.driver.find_element(By.NAME, "last_name").send_keys("Support")
+                pw1 = self.driver.find_element(By.NAME, "password1")
+                pw2 = self.driver.find_element(By.NAME, "password2")
+                pw1.clear(); pw1.send_keys("DemoPass99!!")
+                pw2.clear(); pw2.send_keys("DemoPass99!!")
+                self.driver.find_element(By.NAME, "phone").send_keys("555-0199")
+                checkboxes = self.driver.find_elements(
+                    By.CSS_SELECTOR, "input[name='contact_preferences']"
+                )
+                if checkboxes:
+                    checkboxes[0].click()
+                self.driver.find_element(By.NAME, "relationship_to_clients").send_keys(
+                    "Family member"
+                )
+                self.driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+                # Wait for redirect to coordinator dashboard after auto-login
+                self.wait.until(
+                    lambda d: "coordinator/dashboard" in d.current_url
+                    or "/dashboard" in d.current_url
+                )
+                time.sleep(0.5)
+
+                # Step 4: Support Person Dashboard (auto-logged-in after signup)
+                dashboard_path = reverse("coordinator_dashboard")
+                self._capture_current_page(
+                    "support_person", 4,
+                    "Support Person Dashboard",
+                    "Dedicated dashboard for the support person",
+                    "After accepting the invitation, the support person lands on their dedicated dashboard. It lists the clients they support, their permissions (edit profile, approve careworkers), and any schedule entries awaiting their approval — keeping the support-person role focused and separate from staff or careworker views.",
+                    dashboard_path,
+                )
+            except Exception as exc:
+                print(f"\n  [support_person journey step failed: {exc}]")
 
         with open(OUTPUT_DIR / "manifest.json", "w", encoding="utf-8") as handle:
             json.dump(self.manifest, handle, indent=2)

@@ -1,5 +1,5 @@
 """
-Assemble the captured CareWeb AI journeys into a plain-language Word guide.
+Assemble the captured CareWeb journeys into a plain-language Word guide.
 
 Run after generate_screenshots.py:
     venv/Scripts/python.exe generate_journey_walkthrough.py
@@ -8,7 +8,7 @@ Input:
     screenshots/manifest.json and the referenced PNG files
 
 Output:
-    CareWebAI_User_Journey_Walkthrough.docx
+    CareWeb_User_Journey_Walkthrough.docx
 """
 
 import json
@@ -19,7 +19,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 SCREENSHOT_DIR = BASE_DIR / "screenshots"
-OUTPUT_PATH = BASE_DIR / "CareWebAI_User_Journey_Walkthrough.docx"
+OUTPUT_PATH = BASE_DIR / "CareWeb_User_Journey_Walkthrough.docx"
 
 
 def build_document():
@@ -109,7 +109,7 @@ def build_document():
     doc.add_paragraph()
     cover_title = doc.add_paragraph()
     cover_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = cover_title.add_run("CareWeb AI")
+    run = cover_title.add_run("CareWeb")
     run.bold = True
     run.font.name = "Arial"
     run.font.size = Pt(24)
@@ -132,7 +132,7 @@ def build_document():
     cover_meta = doc.add_paragraph()
     cover_meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = cover_meta.add_run(
-        "Prepared by: CareWeb AI Development Team\n"
+        "Prepared by: CareWeb Development Team\n"
         "Organization: Center for Independent Living (CIL)\n"
         "Demonstration environment: CIL-Care seeded demo data\n"
         "Capture format: 1440px-wide full-page headless Chrome screenshots"
@@ -142,9 +142,9 @@ def build_document():
     doc.add_page_break()
 
     # --------------------------------------------------------------- orientation
-    heading("How CareWeb AI Fits Together")
+    heading("How CareWeb Fits Together")
     paragraph(
-        "CareWeb AI is a Personal Attendant Services coordination workspace. It brings "
+        "CareWeb is a Personal Care Coordination and Stabilization workspace. It brings "
         "together people receiving support, careworkers, and staff at an organization such "
         "as an Independent Living Center. Each person sees a role-specific workspace, while "
         "the underlying relationship can move through matching, approvals, scheduling, "
@@ -198,9 +198,13 @@ def build_document():
             "Client Journey",
             "This journey shows how a person receiving support describes their needs, reviews the coordination workspace, checks the agreed schedule, and shares feedback in their own voice.",
         ),
+        "support_person": (
+            "Support Person Journey",
+            "This journey shows how a client invites a trusted person to participate in their Personal Care Coordination and Stabilization, how that person accepts the invitation and creates their account, and how they use their dedicated dashboard to monitor clients and approve schedule entries.",
+        ),
     }
 
-    for persona in ("careworker", "staff_admin", "client"):
+    for persona in ("careworker", "staff_admin", "client", "support_person"):
         title, overview = persona_info[persona]
         heading(title)
         paragraph(overview)
@@ -246,13 +250,13 @@ def build_document():
         "own responsibilities and gives staff the broader coordination view needed for support."
     )
     table(
-        ["Capability", "Careworker view", "Staff admin view", "Client view"],
+        ["Capability", "Careworker view", "Staff admin view", "Client view", "Support person view"],
         [
-            ("Profile information", "Skills, experience, availability, language, transportation, and preferences.", "Reviews participant information for coordination and matching.", "Care needs, programs, availability, language, preferences, and context."),
-            ("Matching", "Can review suggested relationships relevant to the careworker.", "Can compare candidates, inspect factor breakdowns, and use AI-assisted suggestions.", "Can review careworker suggestions relevant to the client's needs."),
-            ("Scheduling", "Reviews assigned schedules and responds to session details.", "Coordinates schedules and sees approval/relationship status across the organization.", "Creates or reviews schedules and confirms the agreed support arrangement."),
-            ("Feedback", "Rates care fit, communication, reliability, and workload.", "Reviews aggregated patterns and decides whether a check-in is useful.", "Rates the same dimensions independently from the client's perspective."),
-            ("Stability support", "Provides information that may reveal a need for support.", "Sees explainable signals and can flag a relationship for human follow-up.", "Feedback contributes to a fuller picture without an automated decision about care."),
+            ("Profile information", "Skills, experience, availability, language, transportation, and preferences.", "Reviews participant information for coordination and matching.", "Care needs, programs, availability, language, preferences, and context.", "Relationship to client, credentials, contact preferences, and certifications."),
+            ("Matching", "Can review suggested relationships relevant to the careworker.", "Can compare candidates, inspect factor breakdowns, and use AI-assisted suggestions.", "Can review careworker suggestions relevant to the client's needs.", "Invited by the client; not a direct matching participant."),
+            ("Scheduling", "Reviews assigned schedules and responds to session details.", "Coordinates schedules and sees approval/relationship status across the organization.", "Creates or reviews schedules and confirms the agreed support arrangement.", "Reviews and approves or rejects schedule entries on behalf of the client."),
+            ("Feedback", "Rates care fit, communication, reliability, and workload.", "Reviews aggregated patterns and decides whether a check-in is useful.", "Rates the same dimensions independently from the client's perspective.", "Not a direct rater; supports the client's participation."),
+            ("Stability support", "Provides information that may reveal a need for support.", "Sees explainable signals and can flag a relationship for human follow-up.", "Feedback contributes to a fuller picture without an automated decision about care.", "Approves or rejects schedule entries and can be granted profile-editing rights by the client."),
         ],
         font_size=8,
     )
@@ -282,9 +286,9 @@ def build_document():
         size=9.5,
     )
 
-    doc.core_properties.title = "CareWeb AI User Journey Walkthrough"
-    doc.core_properties.subject = "Careworker, staff admin, and client application workflows"
-    doc.core_properties.author = "CareWeb AI Development Team"
+    doc.core_properties.title = "CareWeb User Journey Walkthrough"
+    doc.core_properties.subject = "Careworker, staff admin, client, and support person application workflows"
+    doc.core_properties.author = "CareWeb Development Team"
     doc.core_properties.comments = "Generated from synthetic CIL-Care demo data."
     doc.save(OUTPUT_PATH)
     return OUTPUT_PATH

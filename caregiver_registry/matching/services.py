@@ -701,8 +701,10 @@ def find_best_caregivers_for_client(client, organization, limit=5, tag_ids=None)
     and return only those whose experience_with contains at least one of
     the selected tag keys, sorted by score descending.
 
-    Uses local scoring to filter/rank candidates, then enhances the top results
-    with ChatGPT reasoning.
+    Two-phase strategy (mirrors find_best_pair_for_staff):
+      Phase 1 — fast local scoring over all tag-filtered candidates (no API).
+      Phase 2 — ChatGPT-enhance only the top `limit` results to control cost
+                 and avoid unbounded sequential OpenAI calls.
 
     Returns list of dicts: [{caregiver, score, details, ai_reasoning,
                               criteria_matches}, ...]
@@ -715,7 +717,8 @@ def find_best_caregivers_for_client(client, organization, limit=5, tag_ids=None)
 
     selected_keys, selected_labels = _selected_tag_keys(tag_ids)
 
-    results = []
+    # Phase 1: local scoring over all tag-filtered candidates (fast, no API cost)
+    local_results = []
     for rel in org_caregivers:
         caregiver = rel.caregiver_profile
         cg_skills = set(caregiver.experience_with or [])
@@ -728,18 +731,36 @@ def find_best_caregivers_for_client(client, organization, limit=5, tag_ids=None)
         else:
             criteria_matches = []
 
-        result = compute_ai_enhanced_match_score(caregiver, client, selected_tag_ids=tag_ids)
-        results.append({
+        result = compute_match_score(caregiver, client, selected_tag_ids=tag_ids)
+        local_results.append({
             "caregiver": caregiver,
             "score": result["score"],
             "details": result["details"],
             "ai_reasoning": result["ai_reasoning"],
-            "ai_source": result.get("ai_source", "local_scoring_model"),
+            "ai_source": "local_scoring_model",
             "criteria_matches": criteria_matches,
         })
 
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:limit]
+    local_results.sort(key=lambda x: x["score"], reverse=True)
+    top_local = local_results[:limit]
+
+    # Phase 2: ChatGPT-enhance only the top candidates
+    enhanced_results = []
+    for entry in top_local:
+        ai_result = compute_ai_enhanced_match_score(
+            entry["caregiver"], client, selected_tag_ids=tag_ids
+        )
+        enhanced_results.append({
+            "caregiver": entry["caregiver"],
+            "score": ai_result["score"],
+            "details": ai_result["details"],
+            "ai_reasoning": ai_result["ai_reasoning"],
+            "ai_source": ai_result.get("ai_source", "local_scoring_model"),
+            "criteria_matches": entry["criteria_matches"],
+        })
+
+    enhanced_results.sort(key=lambda x: x["score"], reverse=True)
+    return enhanced_results
 
 
 def find_best_clients_for_caregiver(caregiver, organization, limit=5, tag_ids=None):
@@ -748,7 +769,10 @@ def find_best_clients_for_caregiver(caregiver, organization, limit=5, tag_ids=No
     and return only those whose care_needs contains at least one of the
     selected tag keys, sorted by score descending.
 
-    Uses ChatGPT-enhanced scoring when the API key is available.
+    Two-phase strategy (mirrors find_best_pair_for_staff):
+      Phase 1 — fast local scoring over all tag-filtered candidates (no API).
+      Phase 2 — ChatGPT-enhance only the top `limit` results to control cost
+                 and avoid unbounded sequential OpenAI calls.
 
     Returns list of dicts: [{client, score, details, ai_reasoning,
                               criteria_matches}, ...]
@@ -761,7 +785,8 @@ def find_best_clients_for_caregiver(caregiver, organization, limit=5, tag_ids=No
 
     selected_keys, selected_labels = _selected_tag_keys(tag_ids)
 
-    results = []
+    # Phase 1: local scoring over all tag-filtered candidates (fast, no API cost)
+    local_results = []
     for rel in org_clients:
         client = rel.client_profile
         client_needs = set(client.care_needs or [])
@@ -774,18 +799,36 @@ def find_best_clients_for_caregiver(caregiver, organization, limit=5, tag_ids=No
         else:
             criteria_matches = []
 
-        result = compute_ai_enhanced_match_score(caregiver, client, selected_tag_ids=tag_ids)
-        results.append({
+        result = compute_match_score(caregiver, client, selected_tag_ids=tag_ids)
+        local_results.append({
             "client": client,
             "score": result["score"],
             "details": result["details"],
             "ai_reasoning": result["ai_reasoning"],
-            "ai_source": result.get("ai_source", "local_scoring_model"),
+            "ai_source": "local_scoring_model",
             "criteria_matches": criteria_matches,
         })
 
-    results.sort(key=lambda x: x["score"], reverse=True)
-    return results[:limit]
+    local_results.sort(key=lambda x: x["score"], reverse=True)
+    top_local = local_results[:limit]
+
+    # Phase 2: ChatGPT-enhance only the top candidates
+    enhanced_results = []
+    for entry in top_local:
+        ai_result = compute_ai_enhanced_match_score(
+            caregiver, entry["client"], selected_tag_ids=tag_ids
+        )
+        enhanced_results.append({
+            "client": entry["client"],
+            "score": ai_result["score"],
+            "details": ai_result["details"],
+            "ai_reasoning": ai_result["ai_reasoning"],
+            "ai_source": ai_result.get("ai_source", "local_scoring_model"),
+            "criteria_matches": entry["criteria_matches"],
+        })
+
+    enhanced_results.sort(key=lambda x: x["score"], reverse=True)
+    return enhanced_results
 
 
 def find_best_pair_for_staff(organization, limit=5, tag_ids=None, caregiver=None, client=None):

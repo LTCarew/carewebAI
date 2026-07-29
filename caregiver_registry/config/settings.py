@@ -98,6 +98,11 @@ else:
             'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
             'HOST':     os.getenv('POSTGRES_HOST',     '127.0.0.1'),
             'PORT':     os.getenv('POSTGRES_PORT',     '5432'),
+            # Reuse DB connections across requests instead of opening a new
+            # Cloud SQL socket connection on every request. 60 s is safe for
+            # Cloud Run where each container handles one request at a time per
+            # gunicorn worker thread.
+            'CONN_MAX_AGE': int(os.getenv('CONN_MAX_AGE', '60')),
             'OPTIONS': {
                 # Cloud SQL Auth Proxy (unix socket) for Cloud Run.
                 # When POSTGRES_HOST starts with '/' it is treated as a socket path.

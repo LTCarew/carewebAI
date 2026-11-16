@@ -1,55 +1,131 @@
-# Python
-__pycache__/
-*.py[cod]
 
-# Virtual environments
+# ==========================================
+# Python
+# ==========================================
+
+# Python cache directories
+__pycache__/
+**/__pycache__/
+
+# Compiled Python files
+*.py[cod]
+*$py.class
+
+# Python packaging
+*.egg-info/
+*.egg/
+dist/
+build/
+*.whl
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+
 .venv/
 venv/
 env/
-.env/
+ENV/
 
-# Django database
-db.sqlite3
-*/db.sqlite3
+# ==========================================
+# Environment Variables and Secrets
+# ==========================================
 
-# Media / static files
-media/
-staticfiles/
-
-# Environment variables
 .env
+.env.*
+!.env.example
 *.env
 
-# Logs
+# ==========================================
+# Django
+# ==========================================
+
+# Local SQLite databases
+db.sqlite3
+*.sqlite3
+*.sqlite3-journal
+
+# User-uploaded media
+media/
+
+# Collected static files
+staticfiles/
+
+# Django / Python logs
 *.log
 
-# VSCode
+# ==========================================
+# Testing and Coverage
+# ==========================================
+
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# ==========================================
+# IDEs and Editors
+# ==========================================
+
+# Visual Studio Code
 .vscode/
+
+# PyCharm / JetBrains
+.idea/
+
+# Temporary editor files
+*.swp
+*.swo
+*~
+
+# ==========================================
+# Operating System Files
+# ==========================================
 
 # macOS
 .DS_Store
 
-# Python packaging
-*.egg-info/
-dist/
-build/
+# Windows
+Thumbs.db
+desktop.ini
 
-# Pytest / coverage
-.pytest_cache/
-.coverage
-htmlcov/
+# ==========================================
+# Terraform
+# ==========================================
 
-# Migrations cache
-*.sqlite3-journal
-
-# Terraform secrets — never commit actual variable values
-infra/terraform/terraform.tfvars
+# Terraform variable files and secrets
 infra/terraform/*.tfvars
+infra/terraform/*.tfvars.json
+
+# Allow example Terraform variables
 !infra/terraform/terraform.tfvars.example
 
-# Terraform state and local working files
+# Terraform working directory
 infra/terraform/.terraform/
-infra/terraform/.terraform.lock.hcl
-infra/terraform/terraform.tfstate
-infra/terraform/terraform.tfstate.backup
+
+# Terraform state files
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+
+# Terraform crash logs
 infra/terraform/crash.log
+infra/terraform/crash.*.log
+
+# Terraform override files
+infra/terraform/override.tf
+infra/terraform/override.tf.json
+infra/terraform/*_override.tf
+infra/terraform/*_override.tf.json
+
+# ==========================================
+# Temporary and Backup Files
+# ==========================================
+
+*.tmp
+*.temp
+*.bak
+*.backup
